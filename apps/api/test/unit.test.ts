@@ -5,7 +5,7 @@ import { Counter, Histogram } from '../src/lib/metrics.js';
 import { policies } from '../src/core/policies.js';
 import { excerpt } from '../src/core/mappers.js';
 import { EventBus } from '../src/core/events.js';
-import { DocManager, DOC_TEXT, type DocStore } from '../src/realtime/doc-manager.js';
+import { DocManager, DOC_TEXT, toBytes, type DocStore } from '../src/realtime/doc-manager.js';
 import { logger } from '../src/lib/logger.js';
 
 describe('MemoryCache', () => {
@@ -95,8 +95,11 @@ describe('DocManager', () => {
     return {
       saved,
       loadDocument: async () => ({ state: null, code: initial }),
-      saveDocument: async (_id, _state, text) => {
-        saved.push(text);
+      mergeDocument: async (_id, update) => {
+        const d = new Y.Doc();
+        Y.applyUpdate(d, update);
+        saved.push(d.getText(DOC_TEXT).toString());
+        return update;
       },
     };
   }
@@ -121,6 +124,47 @@ describe('DocManager', () => {
     await docs.release('x');
     expect(s.saved).toEqual(['hello world']);
     expect(docs.size).toBe(0);
+  });
+
+  it('normalises every binary shape a relay can produce', () => {
+    const bytes = Uint8Array.from([1, 2, 3]);
+    expect(toBytes(Buffer.from(bytes))).toEqual(Buffer.from(bytes));
+    expect([...toBytes(bytes.buffer)]).toEqual([1, 2, 3]);
+    expect([...toBytes([1, 2, 3])]).toEqual([1, 2, 3]);
+    expect([...toBytes({ type: 'Buffer', data: [1, 2, 3] })]).toEqual([1, 2, 3]);
+    expect(() => toBytes({ 0: 1 })).toThrow();
+  });
+
+  it('never loses edits when two replicas diverge (merging persistence)', async () => {
+    // A shared "database" row, merged the same way SessionsService.mergeDocument does.
+    const db = new Y.Doc();
+    const store: DocStore = {
+      loadDocument: async () => ({ state: Y.encodeStateAsUpdate(db), code: '' }),
+      mergeDocument: async (_id, update) => {
+        Y.applyUpdate(db, update);
+        return Y.encodeStateAsUpdate(db);
+      },
+    };
+    const r1 = new DocManager(store, logger, 10_000);
+    const r2 = new DocManager(store, logger, 10_000);
+    const d1 = await r1.acquire('s');
+    const d2 = await r2.acquire('s');
+    // Each replica receives only its own client's edit (the cross-replica relay was lost).
+    d1.getText(DOC_TEXT).insert(0, 'from-replica-1 ');
+    r1.applyUpdate('s', new Uint8Array()); // no-op; keeps the API symmetrical
+    const u1 = Y.encodeStateAsUpdate(d1);
+    const fresh = new Y.Doc();
+    fresh.getText(DOC_TEXT).insert(0, 'from-replica-2');
+    expect(r2.applyUpdate('s', Y.encodeStateAsUpdate(fresh))).toBe(true);
+    expect(r1.applyUpdate('s', u1)).toBe(true);
+
+    await r1.flush('s');
+    await r2.flush('s'); // a plain overwrite here would erase replica 1's edit
+    const text = db.getText(DOC_TEXT).toString();
+    expect(text).toContain('from-replica-1');
+    expect(text).toContain('from-replica-2');
+    // ...and replica 2 caught up with replica 1's edit via the merged state.
+    expect(d2.getText(DOC_TEXT).toString()).toContain('from-replica-1');
   });
 
   it('rejects malformed updates', async () => {

@@ -2,13 +2,13 @@
  * Demo data for local development and the live demo. Everything is created through the
  * real services (not raw inserts), so counters, reputation and the ledger stay consistent.
  *
- *   npm run seed -w @devhub/api        (idempotent: skips if demo users already exist)
+ *   npm run seed -w @devhub/api   (idempotent: skips if the demo users already exist)
  *
  * Every demo account uses the password "password123".
  */
-import { loadEnv } from '../src/config/env.js';
-import { createContainer } from '../src/container.js';
-import type { AuthUser } from '../src/middleware/auth.js';
+import { loadEnv } from './config/env.js';
+import { createContainer } from './container.js';
+import type { AuthUser } from './middleware/auth.js';
 
 const PASSWORD = 'password123';
 
@@ -176,6 +176,9 @@ const SNIPPETS = [
 
 async function main() {
   const c = createContainer(loadEnv(), { redis: null });
+  // Several API replicas may boot at once: a session-level advisory lock makes them seed one
+  // at a time (the lock is released when this process disconnects).
+  await c.db.$executeRawUnsafe('SELECT pg_advisory_lock(7310421)');
   const existing = await c.db.user.count({
     where: { username: { in: USERS.map((x) => x.username) } },
   });

@@ -22,7 +22,9 @@
     "test": "npm run build -w @devhub/shared && npm run test --workspaces --if-present",
     "db:up": "docker compose up -d postgres redis",
     "db:migrate": "npm run prisma:migrate -w @devhub/api",
-    "db:seed": "npm run seed -w @devhub/api"
+    "db:seed": "npm run seed -w @devhub/api",
+    "e2e": "npm run e2e -w @devhub/web",
+    "prisma:generate": "npm run prisma:generate -w @devhub/api"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

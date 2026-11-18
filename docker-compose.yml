@@ -1,0 +1,59 @@
+# Full DevHub+ stack:  cp .env.example .env && docker compose up --build
+# Then open http://localhost:8080 (demo login: ada@devhub.dev / password123).
+#
+# Scale the API horizontally (Socket.IO rooms, cache and rate limits are shared through Redis;
+# nginx keeps each client on one replica):  docker compose up --build --scale api=3
+
+name: devhub
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: devhub
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-devhub}
+      POSTGRES_DB: devhub
+    ports: ['5432:5432']
+    volumes: [pgdata:/var/lib/postgresql/data]
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U devhub -d devhub']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    command: ['redis-server', '--save', '', '--appendonly', 'no']
+    ports: ['6379:6379']
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  api:
+    build: { context: ., dockerfile: apps/api/Dockerfile }
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://devhub:${POSTGRES_PASSWORD:-devhub}@postgres:5432/devhub?schema=public
+      REDIS_URL: redis://redis:6379
+      CORS_ORIGINS: ${PUBLIC_URL:-http://localhost:8080}
+      JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET:?Set JWT_ACCESS_SECRET in .env (openssl rand -base64 48)}
+      COOKIE_SECURE: ${COOKIE_SECURE:-false}
+      TRUST_PROXY: 1
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      SEED_DEMO_DATA: ${SEED_DEMO_DATA:-true}
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+    restart: unless-stopped
+
+  web:
+    build: { context: ., dockerfile: apps/web/Dockerfile }
+    ports: ['8080:80']
+    depends_on:
+      api: { condition: service_healthy }
+    restart: unless-stopped
+
+volumes:
+  pgdata:

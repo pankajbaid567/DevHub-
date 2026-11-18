@@ -89,6 +89,29 @@ describe('socket authentication', () => {
   });
 });
 
+describe('document persistence', () => {
+  it('merges concurrent saves under a row lock instead of overwriting', async () => {
+    const host = await registerUser(app);
+    const s = await request(app)
+      .post('/api/v1/sessions')
+      .set(auth(host))
+      .send({ title: 'Merge test' })
+      .expect(201);
+    const edit = (text: string) => {
+      const d = new Y.Doc();
+      d.getText('code').insert(0, text);
+      return Y.encodeStateAsUpdate(d);
+    };
+    await Promise.all([
+      c.sessions.mergeDocument(s.body.id, edit('alpha ')),
+      c.sessions.mergeDocument(s.body.id, edit('beta ')),
+      c.sessions.mergeDocument(s.body.id, edit('gamma')),
+    ]);
+    const saved = await c.db.session.findUniqueOrThrow({ where: { id: s.body.id } });
+    for (const word of ['alpha', 'beta', 'gamma']) expect(saved.code).toContain(word);
+  });
+});
+
 describe('collaboration', () => {
   it('syncs a shared Yjs document between participants and persists it', async () => {
     const host = await registerUser(app);

@@ -48,6 +48,9 @@ export interface ServerToClientEvents {
   'auth:expired': () => void;
 }
 
+/** Name of the shared Y.Text inside each session document (server and Monaco binding). */
+export const DOC_TEXT = 'code';
+
 export const REALTIME_LIMITS = {
   /** Max chat messages per user per 10 s window. */
   chatPer10s: 10,

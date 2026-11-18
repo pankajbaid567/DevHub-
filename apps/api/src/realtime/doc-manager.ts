@@ -1,10 +1,25 @@
 import * as Y from 'yjs';
-import { REALTIME_LIMITS } from '@devhub/shared';
+import { DOC_TEXT, REALTIME_LIMITS } from '@devhub/shared';
 import type { Logger } from '../lib/logger.js';
 
 export interface DocStore {
   loadDocument(sessionId: string): Promise<{ state: Uint8Array | null; code: string } | null>;
-  saveDocument(sessionId: string, state: Uint8Array, text: string): Promise<void>;
+  /** Merges (never overwrites) the update into the stored state; returns the merged state. */
+  mergeDocument(sessionId: string, update: Uint8Array): Promise<Uint8Array>;
+}
+
+/**
+ * Normalises a binary payload. Socket.IO delivers Buffers, but anything relayed through the
+ * Redis adapter's msgpack encoding may arrive as an ArrayBuffer, a number array or a
+ * serialised Buffer object. Getting this wrong silently corrupts CRDT updates.
+ */
+export function toBytes(value: unknown): Uint8Array {
+  if (value instanceof Uint8Array) return value;
+  if (value instanceof ArrayBuffer) return new Uint8Array(value);
+  if (Array.isArray(value)) return Uint8Array.from(value as number[]);
+  const data = (value as { data?: unknown } | null)?.data;
+  if (Array.isArray(data)) return Uint8Array.from(data as number[]);
+  throw new TypeError('Expected binary data');
 }
 
 interface Entry {
@@ -15,8 +30,7 @@ interface Entry {
   timer: NodeJS.Timeout | null;
 }
 
-/** Name of the shared text type inside each session document (the client binds Monaco to it). */
-export const DOC_TEXT = 'code';
+export { DOC_TEXT };
 
 /**
  * Holds one Yjs document per active session in memory.
@@ -24,9 +38,10 @@ export const DOC_TEXT = 'code';
  * - Loaded lazily from Postgres (CRDT state, or seeded from the plain-text snapshot).
  * - Updates are CRDT-merged, so they can be applied in any order and duplicates are harmless;
  *   this is what lets several API instances each keep a copy (see ADR 0003).
- * - Persistence is debounced (every edit marks the doc dirty, a save happens after a quiet
- *   period or at most every `maxDelayMs`), and the doc is flushed and evicted when the last
- *   local editor leaves.
+ * - Persistence is debounced (a save happens after a quiet period) and *merging*: the store
+ *   CRDT-merges this copy into the database row under a lock and hands back the merged
+ *   state, which is applied here so every instance converges even if a relay was lost.
+ * - The doc is flushed and evicted when the last local editor leaves.
  */
 export class DocManager {
   private readonly docs = new Map<string, Entry>();
@@ -124,11 +139,8 @@ export class DocManager {
     if (entry.timer) clearTimeout(entry.timer);
     entry.timer = null;
     try {
-      await this.store.saveDocument(
-        sessionId,
-        Y.encodeStateAsUpdate(entry.doc),
-        entry.doc.getText(DOC_TEXT).toString(),
-      );
+      const merged = await this.store.mergeDocument(sessionId, Y.encodeStateAsUpdate(entry.doc));
+      Y.applyUpdate(entry.doc, merged, 'persistence'); // catch up with other instances' edits
     } catch (err) {
       entry.dirty = true; // retry on the next flush
       this.logger.error({ err, sessionId }, 'failed to persist session document');

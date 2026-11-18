@@ -1,6 +1,7 @@
 import { randomBytes } from 'node:crypto';
+import * as Y from 'yjs';
 import { type Prisma } from '@prisma/client';
-import { createSessionSchema, ErrorCode } from '@devhub/shared';
+import { createSessionSchema, DOC_TEXT, ErrorCode } from '@devhub/shared';
 import type {
   ChatMessageDto,
   CreateSessionInput,
@@ -291,10 +292,28 @@ export class SessionsService {
     return { role: p.role, status: s.status, language: s.language };
   }
 
-  async saveDocument(sessionId: string, state: Uint8Array, text: string): Promise<void> {
-    await this.db.session.update({
-      where: { id: sessionId },
-      data: { docState: Buffer.from(state), code: text },
+  /**
+   * Persists a document update by CRDT-merging it with the stored state under a row lock,
+   * so concurrent saves from different API instances can never overwrite each other's edits.
+   * Returns the merged state, which the caller applies to catch up with other instances.
+   */
+  async mergeDocument(sessionId: string, update: Uint8Array): Promise<Uint8Array> {
+    return this.db.$transaction(async (tx) => {
+      const rows = await tx.$queryRaw<{ docState: Uint8Array | null }[]>`
+        SELECT "docState" FROM sessions WHERE id = ${sessionId} FOR UPDATE`;
+      if (rows.length === 0) throw new NotFoundError('Session');
+      const doc = new Y.Doc();
+      const stored = rows[0]!.docState;
+      if (stored) Y.applyUpdate(doc, new Uint8Array(stored));
+      Y.applyUpdate(doc, update);
+      const merged = Y.encodeStateAsUpdate(doc); // compact: one consolidated update
+      const text = doc.getText(DOC_TEXT).toString();
+      doc.destroy();
+      await tx.session.update({
+        where: { id: sessionId },
+        data: { docState: Buffer.from(merged), code: text },
+      });
+      return merged;
     });
   }
 

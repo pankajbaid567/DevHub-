@@ -22,20 +22,13 @@ export default defineConfig({
     sourcemap: true,
     rollupOptions: {
       output: {
-        // Long-lived vendor chunks: app deploys don't invalidate cached libraries.
+        // Only split out the heavy, self-contained editor stacks. A catch-all "vendor" chunk
+        // created a circular chunk dependency (a TDZ crash in production), so everything
+        // else is left to Rollup's automatic, cycle-free chunking.
         manualChunks(id) {
-          if (!id.includes('node_modules')) return undefined;
-          if (id.includes('monaco-editor')) return 'monaco';
-          if (/[\\/](yjs|y-monaco|y-protocols|lib0)[\\/]/.test(id)) return 'collab';
-          if (
-            /[\\/](react-markdown|remark|rehype|micromark|mdast|hast|unified|highlight\.js)/.test(
-              id,
-            )
-          )
-            return 'markdown';
-          if (/[\\/](react|react-dom|react-router|react-router-dom|scheduler)[\\/]/.test(id))
-            return 'react';
-          return 'vendor';
+          if (id.includes('node_modules/monaco-editor')) return 'monaco';
+          if (/node_modules[\\/](yjs|y-monaco|y-protocols|lib0)[\\/]/.test(id)) return 'collab';
+          return undefined;
         },
       },
     },

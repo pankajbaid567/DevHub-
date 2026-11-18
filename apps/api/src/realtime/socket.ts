@@ -16,7 +16,7 @@ import {
 import type { Container } from '../container.js';
 import { AppError } from '../core/errors.js';
 import { toUserSummary, userSummarySelect } from '../core/mappers.js';
-import { DocManager } from './doc-manager.js';
+import { DocManager, toBytes } from './doc-manager.js';
 
 interface SocketData {
   user: UserSummary & { role: 'USER' | 'ADMIN' };
@@ -73,9 +73,13 @@ export function attachRealtime(httpServer: HttpServer, c: Container) {
   const statusCache = new Map<string, SessionStatus>();
 
   // Updates applied on another instance are merged into this instance's copy (CRDT: order-free).
-  io.on('doc:update', ({ sessionId, update }) =>
-    docs.applyRemote(sessionId, new Uint8Array(update)),
-  );
+  io.on('doc:update', ({ sessionId, update }) => {
+    try {
+      docs.applyRemote(sessionId, toBytes(update));
+    } catch (err) {
+      c.logger.warn({ err, sessionId }, 'ignored malformed relayed update');
+    }
+  });
 
   // ------------------------------------------------------------- handshake authentication
   io.use(async (socket, next) => {
@@ -182,10 +186,16 @@ export function attachRealtime(httpServer: HttpServer, c: Container) {
     on('doc:update', ({ sessionId, update }) => {
       const role = socket.data.sessions[sessionId];
       if (!role || role === 'VIEWER' || statusCache.get(sessionId) !== 'LIVE') return;
-      const bytes = new Uint8Array(update);
+      let bytes: Uint8Array;
+      try {
+        bytes = toBytes(update);
+      } catch {
+        return;
+      }
       if (!docs.applyUpdate(sessionId, bytes)) return;
       socket.to(room(sessionId)).emit('doc:update', { sessionId, update: bytes });
-      if (clustered) io.serverSideEmit('doc:update', { sessionId, update: bytes });
+      // Buffer (not Uint8Array) so msgpack encodes it as binary across the Redis adapter.
+      if (clustered) io.serverSideEmit('doc:update', { sessionId, update: Buffer.from(bytes) });
     });
 
     on('doc:awareness', ({ sessionId, update }) => {

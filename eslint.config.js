@@ -34,7 +34,7 @@ export default tseslint.config(
     languageOptions: { globals: globals.node },
   },
   {
-    files: ['apps/api/prisma/seed.ts', 'apps/api/scripts/**/*.ts'],
+    files: ['apps/api/src/seed.ts', 'apps/api/scripts/**/*.ts'],
     rules: { 'no-console': 'off' },
   },
   {

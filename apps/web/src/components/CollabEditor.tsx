@@ -8,7 +8,7 @@ import {
   encodeAwarenessUpdate,
   removeAwarenessStates,
 } from 'y-protocols/awareness';
-import type { PresenceEntry } from '@devhub/shared';
+import { DOC_TEXT, type PresenceEntry } from '@devhub/shared';
 import { getSocket } from '../lib/socket';
 import CodeEditor from './CodeEditor';
 
@@ -55,7 +55,7 @@ export default function CollabEditor({
     if (!editor) return;
     const socket = getSocket();
     const doc = new Y.Doc();
-    const text = doc.getText('code');
+    const text = doc.getText(DOC_TEXT);
     const awareness = new Awareness(doc);
     awareness.setLocalStateField('user', { name: me.name, color: colorFor(me.id) });
     const binding = new MonacoBinding(text, editor.getModel()!, new Set([editor]), awareness);

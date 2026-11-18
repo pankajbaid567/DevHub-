@@ -2,19 +2,30 @@
   "version": "2.0.0",
   "tasks": [
     {
-      "label": "Start Frontend Dev Server",
+      "label": "dev: api + web",
       "type": "shell",
-      "command": "cd frontend && npm run dev",
+      "command": "npm run dev",
       "isBackground": true,
-      "problemMatcher": [],
-      "group": "build"
+      "problemMatcher": []
     },
     {
-      "label": "Start Frontend Dev Server",
+      "label": "db: start postgres + redis",
       "type": "shell",
-      "command": "cd frontend && npm run dev",
-      "isBackground": true,
-      "group": "build"
+      "command": "npm run db:up",
+      "problemMatcher": []
+    },
+    {
+      "label": "test: all",
+      "type": "shell",
+      "command": "npm test",
+      "group": { "kind": "test", "isDefault": true },
+      "problemMatcher": []
+    },
+    {
+      "label": "e2e",
+      "type": "shell",
+      "command": "npm run e2e -w @devhub/web",
+      "problemMatcher": []
     }
   ]
 }
