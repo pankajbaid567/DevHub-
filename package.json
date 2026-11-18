@@ -20,7 +20,7 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "test": "npm run build -w @devhub/shared && npm run test --workspaces --if-present",
-    "db:up": "docker compose up -d postgres redis",
+    "db:up": "docker compose up -d postgres redis mailpit",
     "db:migrate": "npm run prisma:migrate -w @devhub/api",
     "db:seed": "npm run seed -w @devhub/api",
     "e2e": "npm run e2e -w @devhub/web",

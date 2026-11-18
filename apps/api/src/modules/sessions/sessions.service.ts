@@ -15,10 +15,13 @@ import type {
 } from '@devhub/shared';
 import type { Db } from '../../lib/prisma.js';
 import type { EventBus } from '../../core/events.js';
+import type { Outbox } from '../../jobs/outbox.js';
 import type { AuthUser } from '../../middleware/auth.js';
 import { AppError, ForbiddenError, NotFoundError } from '../../core/errors.js';
 import { assertCan, policies } from '../../core/policies.js';
 import { iso, pageMeta, tagConnect, toUserSummary, userSummarySelect } from '../../core/mappers.js';
+
+export const REMINDER_LEAD_MS = 10 * 60_000;
 
 const include = {
   host: { select: userSummarySelect },
@@ -36,6 +39,7 @@ export class SessionsService {
   constructor(
     private readonly db: Db,
     private readonly events: EventBus,
+    private readonly outbox: Outbox,
   ) {}
 
   private toDto(s: Row, viewer: AuthUser | undefined, myRole: ParticipantRole | null): SessionDto {
@@ -91,22 +95,37 @@ export class SessionsService {
   async create(user: AuthUser, input: CreateSessionInput): Promise<SessionDto> {
     const data = createSessionSchema.parse(input);
     const startNow = !data.scheduledFor;
-    const s = await this.db.session.create({
-      data: {
-        title: data.title,
-        description: data.description,
-        language: data.language,
-        visibility: data.visibility,
-        maxParticipants: data.maxParticipants,
-        inviteCode: data.visibility === 'PRIVATE' ? inviteCode() : null,
-        status: startNow ? 'LIVE' : 'SCHEDULED',
-        startedAt: startNow ? new Date() : null,
-        scheduledFor: data.scheduledFor ? new Date(data.scheduledFor) : null,
-        hostId: user.id,
-        tags: { connectOrCreate: tagConnect(data.tags) },
-        participants: { create: { userId: user.id, role: 'HOST' } },
-      },
-      include,
+    const s = await this.db.$transaction(async (tx) => {
+      const created = await tx.session.create({
+        data: {
+          title: data.title,
+          description: data.description,
+          language: data.language,
+          visibility: data.visibility,
+          maxParticipants: data.maxParticipants,
+          inviteCode: data.visibility === 'PRIVATE' ? inviteCode() : null,
+          status: startNow ? 'LIVE' : 'SCHEDULED',
+          startedAt: startNow ? new Date() : null,
+          scheduledFor: data.scheduledFor ? new Date(data.scheduledFor) : null,
+          hostId: user.id,
+          tags: { connectOrCreate: tagConnect(data.tags) },
+          participants: { create: { userId: user.id, role: 'HOST' } },
+        },
+        include,
+      });
+      // Durable, scheduled side effect: remind everyone 10 minutes before the start.
+      if (created.scheduledFor) {
+        const at = new Date(
+          Math.max(Date.now(), created.scheduledFor.getTime() - REMINDER_LEAD_MS),
+        );
+        await this.outbox.add(
+          tx,
+          'session.reminder',
+          { sessionId: created.id },
+          { availableAt: at },
+        );
+      }
+      return created;
     });
     return this.toDto(s, user, 'HOST');
   }

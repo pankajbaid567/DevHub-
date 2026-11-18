@@ -2,7 +2,12 @@ import { z } from 'zod';
 import type { UserSummary } from './common.js';
 
 export type NotificationType =
-  'ANSWER_POSTED' | 'ANSWER_ACCEPTED' | 'CONTENT_UPVOTED' | 'SNIPPET_STARRED' | 'SESSION_STARTED';
+  | 'ANSWER_POSTED'
+  | 'ANSWER_ACCEPTED'
+  | 'CONTENT_UPVOTED'
+  | 'SNIPPET_STARRED'
+  | 'SESSION_STARTED'
+  | 'SESSION_REMINDER';
 
 export interface NotificationDto {
   id: string;

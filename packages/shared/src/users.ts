@@ -9,6 +9,7 @@ export const updateProfileSchema = z
       .url({ protocol: /^https$/ })
       .max(500)
       .nullable(),
+    emailNotifications: z.boolean(),
   })
   .partial();
 export type UpdateProfileInput = z.infer<typeof updateProfileSchema>;

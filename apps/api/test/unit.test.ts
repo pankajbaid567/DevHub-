@@ -173,3 +173,19 @@ describe('DocManager', () => {
     expect(docs.applyUpdate('y', new Uint8Array([255, 1, 2, 3]))).toBe(false);
   });
 });
+
+describe('email templates', () => {
+  it('escapes user-controlled values in HTML but keeps them readable in text', async () => {
+    const { emails } = await import('../src/jobs/emails.js');
+    const m = emails.notification(
+      'a@example.com',
+      '<img src=x onerror=alert(1)>',
+      'answered "<script>alert(1)</script>"',
+      'https://devhub.dev/questions/1?a=1&b=2',
+    );
+    expect(m.html).not.toMatch(/<script|<img/);
+    expect(m.html).toContain('&lt;script&gt;');
+    expect(m.html).toContain('?a=1&amp;b=2');
+    expect(m.text).toContain('<script>'); // plain text is not HTML
+  });
+});

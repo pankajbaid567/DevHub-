@@ -9,12 +9,14 @@ import { Button } from '../../components/ui/Button';
 import { Field, Input } from '../../components/ui/Field';
 import { AuthShell } from './AuthShell';
 import { safeNext } from '../../lib/navigation';
+import { SocialButtons } from './SocialButtons';
 
 export default function Login() {
   const { login, status } = useAuth();
   const navigate = useNavigate();
   const [params] = useSearchParams();
   const next = safeNext(params.get('next'));
+  const oauthError = params.get('error');
   const {
     register,
     handleSubmit,
@@ -36,6 +38,15 @@ export default function Login() {
 
   return (
     <AuthShell title="Sign in to DevHub+" subtitle="Pick up where you left off.">
+      {oauthError && !errors.root && (
+        <p
+          role="alert"
+          className="mb-4 rounded-lg border border-danger/30 bg-danger/10 px-3 py-2 text-sm text-danger"
+        >
+          {oauthError.slice(0, 200)}
+        </p>
+      )}
+      <SocialButtons next={next} />
       <form onSubmit={onSubmit} className="space-y-4" noValidate>
         {errors.root && (
           <p
@@ -60,6 +71,11 @@ export default function Login() {
             />
           )}
         </Field>
+        <div className="-mt-2 text-right text-xs">
+          <Link to="/forgot-password" className="text-accent hover:underline">
+            Forgot password?
+          </Link>
+        </div>
         <Button type="submit" className="w-full" loading={isSubmitting}>
           Sign in
         </Button>

@@ -116,6 +116,7 @@ export class SnippetsService {
       data: { ...data, tags: { connectOrCreate: tagConnect(data.tags) }, authorId: user.id },
       include,
     });
+    void this.events.emit('content.changed', { kind: 'snippet', id: s.id });
     return toDto(s, false);
   }
 
@@ -132,6 +133,7 @@ export class SnippetsService {
       data: { ...rest, ...(tags && { tags: { set: [], connectOrCreate: tagConnect(tags) } }) },
       include,
     });
+    void this.events.emit('content.changed', { kind: 'snippet', id });
     return toDto(s, (await this.starredSet(user, [id])).has(id));
   }
 
@@ -146,6 +148,7 @@ export class SnippetsService {
       'Only the author can delete this snippet',
     );
     await this.db.snippet.delete({ where: { id } });
+    void this.events.emit('content.changed', { kind: 'snippet', id });
   }
 
   /** Idempotent: starring twice is a no-op, unstarring an unstarred snippet too. */
@@ -207,6 +210,7 @@ export class SnippetsService {
       }),
       this.db.snippet.update({ where: { id }, data: { forkCount: { increment: 1 } } }),
     ]);
+    void this.events.emit('content.changed', { kind: 'snippet', id: fork.id });
     return toDto(fork, false);
   }
 

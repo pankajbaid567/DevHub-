@@ -180,6 +180,7 @@ export class QuestionsService {
       include: summaryInclude,
     });
     await this.cache.del('tags:popular');
+    void this.events.emit('content.changed', { kind: 'question', id: q.id });
     return toSummary(q);
   }
 
@@ -210,6 +211,7 @@ export class QuestionsService {
       },
       include: summaryInclude,
     });
+    void this.events.emit('content.changed', { kind: 'question', id });
     return toSummary(q);
   }
 
@@ -224,6 +226,7 @@ export class QuestionsService {
       'Only the author can delete this question',
     );
     await this.db.question.delete({ where: { id } });
+    void this.events.emit('content.changed', { kind: 'question', id });
   }
 
   async addAnswer(user: AuthUser, questionId: string, body: string): Promise<AnswerDto> {
@@ -250,6 +253,7 @@ export class QuestionsService {
       questionAuthorId: question.authorId,
       actorId: user.id,
     });
+    void this.events.emit('content.changed', { kind: 'answer', id: answer.id });
     return {
       id: answer.id,
       body: answer.body,
@@ -280,6 +284,7 @@ export class QuestionsService {
         data: { lastActivityAt: new Date() },
       }),
     ]);
+    void this.events.emit('content.changed', { kind: 'answer', id: answerId });
     return { id: a.id, body: a.body, updatedAt: a.updatedAt.toISOString() };
   }
 
@@ -311,6 +316,7 @@ export class QuestionsService {
         data: { answerCount: { decrement: 1 } },
       });
     });
+    void this.events.emit('content.changed', { kind: 'answer', id: answerId });
   }
 
   /**

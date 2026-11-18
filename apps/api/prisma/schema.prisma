@@ -57,6 +57,12 @@ enum NotificationType {
   CONTENT_UPVOTED
   SNIPPET_STARRED
   SESSION_STARTED
+  SESSION_REMINDER
+}
+
+enum EmailTokenPurpose {
+  VERIFY_EMAIL
+  RESET_PASSWORD
 }
 
 enum MentorRole {
@@ -65,17 +71,20 @@ enum MentorRole {
 }
 
 model User {
-  id           String   @id @default(cuid())
-  username     String   @unique // stored lowercase
-  email        String   @unique // stored lowercase
-  passwordHash String
-  displayName  String?
-  bio          String?
-  avatarUrl    String?
-  reputation   Int      @default(0) // cached sum of ReputationEvent.delta
-  role         Role     @default(USER)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id                 String    @id @default(cuid())
+  username           String    @unique // stored lowercase
+  email              String    @unique // stored lowercase
+  /// Null for accounts created through GitHub/Google sign-in that never set a password.
+  passwordHash       String?
+  emailVerifiedAt    DateTime?
+  emailNotifications Boolean   @default(true)
+  displayName        String?
+  bio                String?
+  avatarUrl          String?
+  reputation         Int       @default(0) // cached sum of ReputationEvent.delta
+  role               Role      @default(USER)
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
 
   refreshTokens       RefreshToken[]
   questions           Question[]
@@ -92,6 +101,8 @@ model User {
   skills              SkillRating[]
   mentorConversations MentorConversation[]
   resumeReviews       ResumeReview[]
+  oauthAccounts       OAuthAccount[]
+  emailTokens         EmailToken[]
 
   @@index([reputation(sort: Desc)])
   @@map("users")
@@ -115,6 +126,51 @@ model RefreshToken {
   @@index([familyId])
   @@index([userId])
   @@map("refresh_tokens")
+}
+
+/// A linked GitHub/Google identity. One external account maps to exactly one user.
+model OAuthAccount {
+  id                String   @id @default(cuid())
+  userId            String
+  provider          String // "github" | "google"
+  providerAccountId String
+  createdAt         DateTime @default(now())
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@index([userId])
+  @@map("oauth_accounts")
+}
+
+/// Single-use email links (verification, password reset). Only a SHA-256 hash is stored.
+model EmailToken {
+  id        String            @id @default(cuid())
+  userId    String
+  purpose   EmailTokenPurpose
+  tokenHash String            @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime          @default(now())
+  user      User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, purpose])
+  @@map("email_tokens")
+}
+
+/// Transactional outbox: a job is written in the same transaction as the change that
+/// causes it, then relayed to the queue. No "row committed but email lost" window.
+model OutboxEvent {
+  id           String    @id @default(cuid())
+  topic        String
+  payload      Json
+  availableAt  DateTime  @default(now())
+  dispatchedAt DateTime?
+  attempts     Int       @default(0)
+  lastError    String?
+  createdAt    DateTime  @default(now())
+
+  @@index([dispatchedAt, availableAt])
+  @@map("outbox")
 }
 
 model Tag {
@@ -265,6 +321,8 @@ model Session {
   code            String            @default("") // plain-text snapshot of the shared document
   docState        Bytes? // Yjs CRDT state (Y.encodeStateAsUpdate)
   scheduledFor    DateTime?
+  /// Set atomically by the reminder job so a re-delivered job cannot remind twice.
+  reminderSentAt  DateTime?
   startedAt       DateTime?
   endedAt         DateTime?
   hostId          String
@@ -355,6 +413,8 @@ model MentorMessage {
   role           MentorRole
   content        String
   model          String?
+  /// Citations (CitationDto[]) from retrieval-augmented replies.
+  sources        Json?
   createdAt      DateTime           @default(now())
   conversation   MentorConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
 
@@ -374,4 +434,24 @@ model ResumeReview {
 
   @@index([userId, createdAt(sort: Desc)])
   @@map("resume_reviews")
+}
+
+/// Semantic-search index (pgvector). One row per chunk of a question, answer or snippet.
+/// The HNSW index (cosine) is created in the migration: Prisma cannot express it.
+model ContentEmbedding {
+  id          String                     @id @default(cuid())
+  kind        String // "question" | "answer" | "snippet"
+  refId       String
+  chunk       Int                        @default(0)
+  /// For answers: the question they belong to (citations link there).
+  questionId  String?
+  content     String
+  contentHash String
+  model       String
+  embedding   Unsupported("vector(768)")
+  updatedAt   DateTime                   @updatedAt
+
+  @@unique([kind, refId, chunk])
+  @@index([kind, model])
+  @@map("content_embeddings")
 }

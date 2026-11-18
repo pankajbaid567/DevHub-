@@ -35,6 +35,8 @@ export interface DomainEvents {
   'snippet.starred': { snippetId: string; title: string; authorId: string; actorId: string };
   'session.started': { sessionId: string; title: string; hostId: string; participantIds: string[] };
   'session.ended': { sessionId: string };
+  /** Searchable content was created, edited or deleted (drives re-indexing). */
+  'content.changed': { kind: 'question' | 'answer' | 'snippet'; id: string };
 }
 
 type Handler<K extends keyof DomainEvents> = (payload: DomainEvents[K]) => void | Promise<void>;

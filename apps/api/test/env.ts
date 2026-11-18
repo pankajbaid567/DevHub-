@@ -1,8 +1,9 @@
 // Runs before every test file, before any app module is imported.
-// Default: the docker-compose Postgres, isolated in a separate `test` schema (demo data untouched).
+// Default: the docker-compose Postgres, in a separate `devhub_test` database (demo data untouched).
 process.env.NODE_ENV = 'test';
 process.env.DATABASE_URL =
-  process.env.TEST_DATABASE_URL ?? 'postgresql://devhub:devhub@localhost:5432/devhub?schema=test';
+  process.env.TEST_DATABASE_URL ??
+  'postgresql://devhub:devhub@localhost:5432/devhub_test?schema=public';
 process.env.JWT_ACCESS_SECRET = 'test-secret-0123456789abcdefghijklmnopqrstuvwxyz';
 process.env.CORS_ORIGINS = 'http://localhost:5173';
 delete process.env.REDIS_URL;

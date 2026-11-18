@@ -3,6 +3,16 @@ import type { CursorPage, CursorQuery, NotificationDto } from '@devhub/shared';
 import type { Db } from '../../lib/prisma.js';
 import type { EventBus } from '../../core/events.js';
 import { toUserSummary, userSummarySelect } from '../../core/mappers.js';
+import type { Outbox } from '../../jobs/outbox.js';
+import { emails } from '../../jobs/emails.js';
+
+/** Types worth an email; votes and stars stay in-app so inboxes are not flooded. */
+const EMAIL_TYPES: ReadonlySet<NotificationType> = new Set([
+  'ANSWER_POSTED',
+  'ANSWER_ACCEPTED',
+  'SESSION_STARTED',
+  'SESSION_REMINDER',
+]);
 
 const include = { actor: { select: userSummarySelect } } satisfies Prisma.NotificationInclude;
 type Row = Prisma.NotificationGetPayload<{ include: typeof include }>;
@@ -29,7 +39,11 @@ const truncate = (s: string, n = 80) => (s.length > n ? `${s.slice(0, n - 1)}…
 export class NotificationsService {
   private pusher: NotificationPusher = () => {};
 
-  constructor(private readonly db: Db) {}
+  constructor(
+    private readonly db: Db,
+    private readonly outbox: Outbox,
+    private readonly publicUrl: string,
+  ) {}
 
   setPusher(pusher: NotificationPusher): void {
     this.pusher = pusher;
@@ -97,10 +111,29 @@ export class NotificationsService {
     message: string,
     link: string,
   ): Promise<void> {
-    const n = await this.db.notification.create({
-      data: { userId, actorId, type, message, link },
-      include,
+    // The in-app notification and its email (if any) commit together: transactional outbox.
+    const n = await this.db.$transaction(async (tx) => {
+      const row = await tx.notification.create({
+        data: { userId, actorId, type, message, link },
+        include,
+      });
+      if (EMAIL_TYPES.has(type)) {
+        const to = await tx.user.findUnique({
+          where: { id: userId },
+          select: { email: true, emailVerifiedAt: true, emailNotifications: true },
+        });
+        if (to?.emailVerifiedAt && to.emailNotifications) {
+          const actor = row.actor?.displayName ?? row.actor?.username ?? 'DevHub+';
+          await this.outbox.add(
+            tx,
+            'email.send',
+            emails.notification(to.email, actor, message, `${this.publicUrl}${link}`),
+          );
+        }
+      }
+      return row;
     });
+    if (EMAIL_TYPES.has(type)) this.outbox.poke();
     this.pusher(userId, toDto(n));
   }
 

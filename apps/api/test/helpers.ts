@@ -5,6 +5,8 @@ import { loadEnv } from '../src/config/env.js';
 import { createContainer, type Container } from '../src/container.js';
 import { createApp } from '../src/app.js';
 import type { AIProvider, GenerateRequest } from '../src/modules/ai/providers/provider.js';
+import { LogMailer } from '../src/jobs/mailer.js';
+import { InlineJobQueue } from '../src/jobs/queue.js';
 
 /** Scriptable fake LLM: tests queue the raw text the "model" should return. */
 export class FakeProvider implements AIProvider {
@@ -41,16 +43,51 @@ export interface TestContext {
   c: Container;
   app: Express;
   ai: FakeProvider;
+  mailer: LogMailer;
 }
 
-export function createTestApp(): TestContext {
+export function createTestApp(overrides: Parameters<typeof createContainer>[1] = {}): TestContext {
   const ai = new FakeProvider();
-  const c = createContainer(loadEnv(), { aiProvider: ai, redis: null });
+  const mailer = new LogMailer(silentLogger);
+  const c = createContainer(loadEnv(), {
+    aiProvider: ai,
+    redis: null,
+    mailer,
+    inlineRetryDelay: () => 0,
+    ...overrides,
+  });
+  c.queue.startWorker();
   const { app } = createApp(c, { disableRateLimits: true });
-  return { c, app, ai };
+  return { c, app, ai, mailer };
+}
+
+const silentLogger = {
+  info: () => {},
+  warn: () => {},
+  error: () => {},
+} as unknown as ConstructorParameters<typeof LogMailer>[0];
+
+/** Waits until background work settles: outbox relayed, queued jobs (and their children) done. */
+export async function settle(c: Container): Promise<void> {
+  for (let i = 0; i < 3; i++) {
+    await c.outbox.flush();
+    if (c.queue instanceof InlineJobQueue) await c.queue.drain();
+  }
+}
+
+/** Extracts the token from the last email link containing `path`. */
+export function tokenFromEmail(mailer: LogMailer, path: string): string {
+  const msg = [...mailer.sent].reverse().find((m) => m.text.includes(path));
+  const match = msg?.text.match(new RegExp(`${path}\\?token=([\\w-]+)`));
+  if (!match) throw new Error(`no email with ${path}`);
+  return match[1]!;
 }
 
 const TABLES = [
+  'content_embeddings',
+  'outbox',
+  'email_tokens',
+  'oauth_accounts',
   'mentor_messages',
   'mentor_conversations',
   'resume_reviews',

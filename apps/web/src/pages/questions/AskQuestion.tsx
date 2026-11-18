@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { Controller, useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useNavigate, useParams } from 'react-router-dom';
+import { DuplicateHint } from '../../components/SimilarQuestions';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Lightbulb } from 'lucide-react';
 import { toast } from 'sonner';
@@ -114,6 +115,7 @@ export default function AskQuestion() {
                 />
               )}
             </Field>
+            <DuplicateHint title={values.title ?? ''} {...(id && { excludeId: id })} />
             <Field
               label="Details"
               error={errors.body?.message}

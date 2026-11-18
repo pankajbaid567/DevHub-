@@ -102,6 +102,11 @@ export class MetricsRegistry {
     new Counter('ai_requests_total', 'AI provider calls by operation and outcome'),
   );
 
+  readonly jobs = this.add(new Counter('jobs_total', 'Background jobs by name and outcome'));
+  readonly jobDuration = this.add(
+    new Histogram('job_duration_seconds', 'Background job run time', [0.05, 0.25, 1, 5, 30]),
+  );
+
   add<M extends Metric>(m: M): M {
     this.metrics.push(m);
     return m;

@@ -42,6 +42,8 @@ const envSchema = z
     GEMINI_API_KEY: z.string().optional(),
     GEMINI_MODEL: z.string().default('gemini-3.8-flash'),
     GEMINI_FALLBACK_MODEL: z.string().default('gemini-3.5-flash-lite'),
+    /** Embedding model for semantic search / RAG (768-dim output is requested). */
+    GEMINI_EMBED_MODEL: z.string().default('gemini-embedding-001'),
     AI_TIMEOUT_MS: z.coerce.number().int().min(1_000).max(120_000).default(45_000),
     /** Comma-separated STUN URLs for WebRTC calls. */
     STUN_URLS: z
@@ -57,6 +59,20 @@ const envSchema = z
     TURN_URL: z.string().optional(),
     TURN_USERNAME: z.string().optional(),
     TURN_CREDENTIAL: z.string().optional(),
+    /** Origin of the web app, used for links in emails and OAuth redirects. */
+    PUBLIC_URL: z.string().url().optional(),
+    /** e.g. smtp://user:pass@smtp.example.com:587. Unset: emails are logged, not sent. */
+    SMTP_URL: z.string().optional(),
+    MAIL_FROM: z.string().default('DevHub+ <no-reply@devhub.dev>'),
+    /** Whether this process consumes background jobs (producers always work). */
+    WORKER_ENABLED: z
+      .enum(['true', 'false'])
+      .default('true')
+      .transform((v) => v === 'true'),
+    GITHUB_CLIENT_ID: z.string().optional(),
+    GITHUB_CLIENT_SECRET: z.string().optional(),
+    GOOGLE_CLIENT_ID: z.string().optional(),
+    GOOGLE_CLIENT_SECRET: z.string().optional(),
     AI_REQUESTS_PER_HOUR: z.coerce.number().int().min(1).max(1_000).default(30),
     /** Disable only for local load/E2E testing; refused in production. */
     RATE_LIMITS_ENABLED: z
@@ -70,6 +86,17 @@ const envSchema = z
     isTest: e.NODE_ENV === 'test',
     cookieSecure: e.COOKIE_SECURE ?? e.NODE_ENV === 'production',
     aiEnabled: Boolean(e.GEMINI_API_KEY && !e.GEMINI_API_KEY.startsWith('your-')),
+    publicUrl: (e.PUBLIC_URL ?? e.CORS_ORIGINS[0] ?? 'http://localhost:5173').replace(/\/$/, ''),
+    oauth: {
+      github:
+        e.GITHUB_CLIENT_ID && e.GITHUB_CLIENT_SECRET
+          ? { clientId: e.GITHUB_CLIENT_ID, clientSecret: e.GITHUB_CLIENT_SECRET }
+          : null,
+      google:
+        e.GOOGLE_CLIENT_ID && e.GOOGLE_CLIENT_SECRET
+          ? { clientId: e.GOOGLE_CLIENT_ID, clientSecret: e.GOOGLE_CLIENT_SECRET }
+          : null,
+    },
   }));
 
 export type Env = z.infer<typeof envSchema>;

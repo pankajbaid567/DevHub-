@@ -13,10 +13,13 @@ import {
   Send,
   Square,
   Trash2,
+  BookOpen,
+  CheckCircle2,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import {
   MENTOR_TOPICS,
+  type CitationDto,
   type ConversationDto,
   type ConversationSummaryDto,
   type MentorMessageDto,
@@ -73,7 +76,12 @@ export default function Mentor() {
   const qc = useQueryClient();
   const { user } = useAuth();
   const [input, setInput] = useState('');
-  const [streaming, setStreaming] = useState<{ text: string; model: string } | null>(null);
+  const [streaming, setStreaming] = useState<{
+    text: string;
+    model: string;
+    sources: CitationDto[];
+  } | null>(null);
+  const [useCommunity, setUseCommunity] = useState(true);
   const abortRef = useRef<AbortController | null>(null);
   const bottom = useRef<HTMLDivElement>(null);
   useDocumentTitle('AI Mentor');
@@ -123,6 +131,7 @@ export default function Mentor() {
       role: 'user',
       content,
       model: null,
+      sources: [],
       createdAt: new Date().toISOString(),
     };
     qc.setQueryData<ConversationDto>(key, (old) =>
@@ -130,16 +139,18 @@ export default function Mentor() {
     );
     const abort = new AbortController();
     abortRef.current = abort;
-    setStreaming({ text: '', model: '' });
+    setStreaming({ text: '', model: '', sources: [] });
     try {
       for await (const ev of streamEvents(
         `/ai/conversations/${id}/messages`,
-        { content },
+        { content, useCommunity },
         abort.signal,
       )) {
-        if (ev.type === 'start') setStreaming({ text: '', model: ev.model });
+        if (ev.type === 'start') setStreaming({ text: '', model: ev.model, sources: [] });
+        else if (ev.type === 'sources')
+          setStreaming((s) => (s ? { ...s, sources: ev.sources } : s));
         else if (ev.type === 'delta')
-          setStreaming((s) => ({ model: s?.model ?? '', text: (s?.text ?? '') + ev.text }));
+          setStreaming((s) => (s ? { ...s, text: s.text + ev.text } : s));
         else if (ev.type === 'error') toast.error(ev.message);
       }
     } catch (err) {
@@ -250,11 +261,18 @@ export default function Mentor() {
                   key={m.id}
                   role={m.role}
                   content={m.content}
+                  sources={m.sources}
                   name={user?.displayName ?? user?.username ?? 'You'}
                 />
               ))}
               {streaming && (
-                <Message role="assistant" content={streaming.text || '…'} name="Mentor" streaming />
+                <Message
+                  role="assistant"
+                  content={streaming.text || '…'}
+                  sources={streaming.sources}
+                  name="Mentor"
+                  streaming
+                />
               )}
               <div ref={bottom} />
             </div>
@@ -296,6 +314,16 @@ export default function Mentor() {
                   </Button>
                 )}
               </div>
+              <label className="mt-2 flex w-fit cursor-pointer items-center gap-2 text-xs text-muted">
+                <input
+                  type="checkbox"
+                  checked={useCommunity}
+                  onChange={(e) => setUseCommunity(e.target.checked)}
+                  className="accent-[var(--color-accent)]"
+                />
+                <BookOpen className="h-3.5 w-3.5" aria-hidden />
+                Ground answers in DevHub+ community posts (with citations)
+              </label>
             </form>
           </>
         )}
@@ -304,16 +332,52 @@ export default function Mentor() {
   );
 }
 
+/** Numbered community sources behind a grounded reply; the text cites them as [n]. */
+function Sources({ sources }: { sources: CitationDto[] }) {
+  if (!sources.length) return null;
+  return (
+    <details className="mt-3 border-t border-line pt-2 text-xs">
+      <summary className="cursor-pointer text-muted select-none hover:text-fg">
+        <BookOpen className="mr-1 inline h-3.5 w-3.5" aria-hidden />
+        {sources.length} community {sources.length === 1 ? 'source' : 'sources'}
+      </summary>
+      <ol className="mt-2 space-y-2">
+        {sources.map((src) => (
+          <li key={src.n} className="flex gap-2">
+            <span className="font-mono text-accent">[{src.n}]</span>
+            <div className="min-w-0">
+              <Link
+                to={`/questions/${src.questionId}${src.answerId ? `#answer-${src.answerId}` : ''}`}
+                className="font-medium hover:text-accent hover:underline"
+              >
+                {src.questionTitle}
+              </Link>
+              {src.accepted && (
+                <span className="ml-1.5 inline-flex items-center gap-0.5 text-success">
+                  <CheckCircle2 className="h-3 w-3" aria-hidden /> accepted answer
+                </span>
+              )}
+              <p className="line-clamp-2 text-muted">{src.excerpt}</p>
+            </div>
+          </li>
+        ))}
+      </ol>
+    </details>
+  );
+}
+
 function Message({
   role,
   content,
   name,
   streaming,
+  sources = [],
 }: {
   role: 'user' | 'assistant';
   content: string;
   name: string;
   streaming?: boolean;
+  sources?: CitationDto[];
 }) {
   return (
     <div className={cn('flex gap-3', role === 'user' && 'flex-row-reverse')}>
@@ -341,6 +405,7 @@ function Message({
             aria-hidden
           />
         )}
+        {role === 'assistant' && <Sources sources={sources} />}
       </div>
     </div>
   );

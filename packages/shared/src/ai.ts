@@ -1,3 +1,4 @@
+import type { CitationDto } from './search.js';
 import { z } from 'zod';
 import { languageSchema } from './common.js';
 
@@ -18,6 +19,8 @@ export const createConversationSchema = z.object({
 export const mentorMessageSchema = z.object({
   content: z.string().trim().min(1).max(8_000),
   code: z.string().max(20_000).optional(),
+  /** Ground the reply in community answers (retrieval-augmented generation). */
+  useCommunity: z.boolean().default(true),
 });
 export type MentorMessageInput = z.infer<typeof mentorMessageSchema>;
 
@@ -26,6 +29,8 @@ export interface MentorMessageDto {
   role: 'user' | 'assistant';
   content: string;
   model: string | null;
+  /** Community sources the reply was grounded in (assistant messages only). */
+  sources: CitationDto[];
   createdAt: string;
 }
 
@@ -44,6 +49,8 @@ export interface ConversationDto extends ConversationSummaryDto {
 /** Server-sent events emitted while the mentor streams a reply. */
 export type MentorStreamEvent =
   | { type: 'start'; messageId: string; model: string }
+  /** Community answers retrieved for this reply (RAG); the reply cites them as [n]. */
+  | { type: 'sources'; sources: CitationDto[] }
   | { type: 'delta'; text: string }
   | { type: 'done'; messageId: string; title?: string }
   | { type: 'error'; code: string; message: string };

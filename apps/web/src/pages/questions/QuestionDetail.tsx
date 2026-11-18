@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
+import { RelatedQuestions } from '../../components/SimilarQuestions';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Check, CheckCircle2, Eye, Pencil, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -368,6 +369,9 @@ export default function QuestionDetail() {
         )}
         <AnswerComposer questionId={q.id} />
       </section>
+      <div className="mt-8">
+        <RelatedQuestions questionId={q.id} />
+      </div>
     </div>
   );
 }

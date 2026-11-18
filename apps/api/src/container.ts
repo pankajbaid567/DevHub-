@@ -17,6 +17,15 @@ import { AiService } from './modules/ai/ai.service.js';
 import type { AIProvider } from './modules/ai/providers/provider.js';
 import { GeminiProvider } from './modules/ai/providers/gemini.js';
 import { DemoProvider } from './modules/ai/providers/demo.js';
+import { EmailTokenService } from './modules/auth/email-token.service.js';
+import { OAuthService } from './modules/auth/oauth.service.js';
+import { GeminiEmbedder, HashEmbedder, type Embedder } from './modules/search/embedder.js';
+import { SearchIndexer } from './modules/search/indexer.js';
+import { SearchService } from './modules/search/search.service.js';
+import { BullJobQueue, InlineJobQueue, type JobHandlers, type JobQueue } from './jobs/queue.js';
+import { Outbox } from './jobs/outbox.js';
+import { LogMailer, SmtpMailer, type Mailer } from './jobs/mailer.js';
+import { createHandlers } from './jobs/handlers.js';
 
 /**
  * Composition root: the one place where concrete implementations are chosen and wired.
@@ -39,12 +48,25 @@ export interface Container {
   notifications: NotificationsService;
   users: UsersService;
   ai: AiService;
+  queue: JobQueue;
+  outbox: Outbox;
+  mailer: Mailer;
+  oauth: OAuthService;
+  indexer: SearchIndexer;
+  search: SearchService;
 }
 
 export interface ContainerOverrides {
   db?: Db;
   aiProvider?: AIProvider;
   redis?: Redis | null;
+  mailer?: Mailer;
+  embedder?: Embedder;
+  /** HTTP client for OAuth provider calls (faked in tests). */
+  oauthFetch?: typeof fetch;
+  oauthConfigs?: Env['oauth'];
+  /** Retry delay for the in-process queue (tests use 0). */
+  inlineRetryDelay?: (attempt: number) => number;
 }
 
 export function createContainer(env: Env, overrides: ContainerOverrides = {}): Container {
@@ -64,8 +86,36 @@ export function createContainer(env: Env, overrides: ContainerOverrides = {}): C
 
   const tokens = new TokenService(db, env, logger);
   const reputation = new ReputationService();
-  const notifications = new NotificationsService(db);
+
+  // Jobs: the queue reads handlers at run time, so they can be filled in after construction
+  // (handlers depend on services that themselves enqueue jobs).
+  const handlers = {} as JobHandlers;
+  const queue: JobQueue =
+    env.REDIS_URL && overrides.redis !== null
+      ? new BullJobQueue(
+          new Redis(env.REDIS_URL, { maxRetriesPerRequest: null }),
+          handlers,
+          logger,
+          metrics,
+        )
+      : new InlineJobQueue(handlers, logger, metrics, overrides.inlineRetryDelay);
+  const outbox = new Outbox(db, queue, logger);
+  const mailer: Mailer =
+    overrides.mailer ??
+    (env.SMTP_URL ? new SmtpMailer(env.SMTP_URL, env.MAIL_FROM) : new LogMailer(logger));
+
+  const notifications = new NotificationsService(db, outbox, env.publicUrl);
   notifications.subscribe(events);
+
+  const embedder: Embedder =
+    overrides.embedder ??
+    (env.aiEnabled
+      ? new GeminiEmbedder(env.GEMINI_API_KEY!, env.GEMINI_EMBED_MODEL)
+      : new HashEmbedder());
+  const indexer = new SearchIndexer(db, embedder);
+  const search = new SearchService(db, embedder, cache);
+  // Index asynchronously after every content change; the reconcile job heals anything missed.
+  events.on('content.changed', (e) => queue.add('search.index', e));
 
   const aiProvider: AIProvider =
     overrides.aiProvider ??
@@ -81,6 +131,11 @@ export function createContainer(env: Env, overrides: ContainerOverrides = {}): C
         )
       : new DemoProvider());
 
+  Object.assign(
+    handlers,
+    createHandlers({ db, logger, mailer, outbox, tokens, notifications, indexer }),
+  );
+
   return {
     env,
     logger,
@@ -90,12 +145,22 @@ export function createContainer(env: Env, overrides: ContainerOverrides = {}): C
     metrics,
     events,
     tokens,
-    auth: new AuthService(db, tokens),
+    auth: new AuthService(db, tokens, new EmailTokenService(), outbox, env.publicUrl),
     questions: new QuestionsService(db, cache, events, reputation),
     snippets: new SnippetsService(db, events),
-    sessions: new SessionsService(db, events),
+    sessions: new SessionsService(db, events, outbox),
     notifications,
     users: new UsersService(db, cache),
-    ai: new AiService(db, aiProvider, logger, metrics),
+    ai: new AiService(db, aiProvider, logger, metrics, (text) => search.retrieve(text)),
+    queue,
+    outbox,
+    mailer,
+    oauth: new OAuthService(
+      overrides.oauthConfigs ?? env.oauth,
+      env.publicUrl,
+      overrides.oauthFetch,
+    ),
+    indexer,
+    search,
   };
 }

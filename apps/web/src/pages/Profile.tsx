@@ -23,6 +23,7 @@ import { qk, queryClient } from '../lib/queryClient';
 import { useAuth } from '../auth/context';
 import { useDocumentTitle, useUrlState } from '../lib/hooks';
 import { ResumeReviewer, Skills } from './Career';
+import { AccountSettings } from './AccountSettings';
 import { displayName } from '../lib/utils';
 import {
   Avatar,
@@ -120,9 +121,9 @@ export default function Profile() {
   const { user } = useAuth();
   const isMe = user?.username === username.toLowerCase();
   const [url, setUrl] = useUrlState({ tab: 'questions' });
-  type Tab = 'questions' | 'snippets' | 'resume' | 'skills';
+  type Tab = 'questions' | 'snippets' | 'resume' | 'skills' | 'account';
   const allowed: Tab[] = isMe
-    ? ['questions', 'snippets', 'resume', 'skills']
+    ? ['questions', 'snippets', 'resume', 'skills', 'account']
     : ['questions', 'snippets'];
   const tab: Tab = allowed.includes(url.tab as Tab) ? (url.tab as Tab) : 'questions';
   const setTab = (t: Tab) => setUrl({ tab: t });
@@ -266,17 +267,21 @@ export default function Profile() {
               ? [
                   { value: 'resume' as const, label: 'AI resume review' },
                   { value: 'skills' as const, label: 'Skills & roadmap' },
+                  { value: 'account' as const, label: 'Account' },
                 ]
               : []),
           ]}
         />
-        {(tab === 'resume' || tab === 'skills') && (
+        {(tab === 'resume' || tab === 'skills' || tab === 'account') && (
           <p className="mt-3 text-xs text-muted">
-            Only you can see this tab. Uploaded resumes are never shown on your public profile.
+            Only you can see this tab.
+            {tab === 'resume' && ' Uploaded resumes are never shown on your public profile.'}
           </p>
         )}
         <div className="mt-4">
-          {tab === 'resume' ? (
+          {tab === 'account' ? (
+            <AccountSettings />
+          ) : tab === 'resume' ? (
             <ResumeReviewer />
           ) : tab === 'skills' ? (
             <Skills />

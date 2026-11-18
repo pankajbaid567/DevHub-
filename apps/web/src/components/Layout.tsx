@@ -10,6 +10,7 @@ import {
   Monitor,
   Moon,
   Search,
+  Settings,
   Sparkles,
   Sun,
   Trophy,
@@ -21,6 +22,7 @@ import {
 import { useAuth } from '../auth/context';
 import { useTheme, type ThemeChoice } from '../theme/context';
 import { NotificationBell } from './NotificationBell';
+import { VerifyEmailBanner } from './VerifyEmailBanner';
 import { Avatar } from './ui/primitives';
 import { Button, ButtonLink } from './ui/Button';
 import { PageSpinner } from './ui/Spinner';
@@ -82,7 +84,7 @@ function SearchBox({ className }: { className?: string }) {
       className={cn('relative', className)}
       onSubmit={(e) => {
         e.preventDefault();
-        if (q.trim()) navigate(`/questions?q=${encodeURIComponent(q.trim())}`);
+        if (q.trim()) navigate(`/search?q=${encodeURIComponent(q.trim())}`);
       }}
     >
       <Search
@@ -92,8 +94,8 @@ function SearchBox({ className }: { className?: string }) {
       <input
         value={q}
         onChange={(e) => setQ(e.target.value)}
-        placeholder="Search questions…"
-        aria-label="Search questions"
+        placeholder="Search questions & snippets…"
+        aria-label="Search questions and snippets"
         className="h-9 w-full rounded-lg border border-line bg-surface-2 pr-3 pl-9 text-sm placeholder:text-muted focus:border-accent focus:bg-surface focus:outline-none"
       />
     </form>
@@ -135,6 +137,9 @@ function UserMenu() {
           </Link>
           <Link to={`/u/${user.username}?tab=resume`} className={item}>
             <Sparkles className="h-4 w-4" /> Resume & skills
+          </Link>
+          <Link to={`/u/${user.username}?tab=account`} className={item}>
+            <Settings className="h-4 w-4" /> Account settings
           </Link>
           <hr className="my-1 border-line" />
           <button
@@ -301,6 +306,7 @@ export function Layout() {
         Skip to content
       </a>
       <Navbar />
+      <VerifyEmailBanner />
       <main id="main" className="flex-1">
         <ErrorBoundary>
           <Suspense fallback={<PageSpinner />}>

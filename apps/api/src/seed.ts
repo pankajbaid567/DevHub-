@@ -203,6 +203,7 @@ async function main() {
         displayName: u.displayName,
       },
       {},
+      { verified: true },
     );
     await c.users.updateProfile(user.id, { bio: u.bio });
     users.set(u.username, { id: user.id, role: 'USER' });

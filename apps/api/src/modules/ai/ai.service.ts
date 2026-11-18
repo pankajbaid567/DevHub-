@@ -4,6 +4,7 @@ import {
   resumeReviewResultSchema,
   skillAssessmentResultSchema,
   type AiResultEnvelope,
+  type CitationDto,
   type CodeAssistInput,
   type ConversationDto,
   type ConversationSummaryDto,
@@ -22,6 +23,7 @@ import { AppError, NotFoundError } from '../../core/errors.js';
 import { AIUnavailableError, type AIProvider, type ChatTurn } from './providers/provider.js';
 import {
   CODE_EXPLAIN_PROMPT,
+  groundingBlock,
   CODE_REVIEW_PROMPT,
   mentorSystemPrompt,
   RESUME_PROMPT,
@@ -47,6 +49,8 @@ export class AiService {
     private readonly provider: AIProvider,
     private readonly logger: Logger,
     private readonly metrics: MetricsRegistry,
+    /** Retrieval for grounded mentor replies (RAG). */
+    private readonly retrieve: (text: string) => Promise<CitationDto[]> = async () => [],
   ) {}
 
   get isDemo(): boolean {
@@ -99,6 +103,7 @@ export class AiService {
         role: m.role,
         content: m.content,
         model: m.model,
+        sources: (m.sources as unknown as CitationDto[] | null) ?? [],
         createdAt: m.createdAt.toISOString(),
       })),
     };
@@ -136,18 +141,34 @@ export class AiService {
       { role: 'user', content },
     ];
 
+    // Retrieval is best-effort: if the index or embedding API fails, answer ungrounded.
+    let sources: CitationDto[] = [];
+    if (input.useCommunity !== false) {
+      sources = await this.retrieve(input.content).catch((err: unknown) => {
+        this.logger.warn({ err: (err as Error).message }, 'mentor retrieval failed');
+        return [];
+      });
+    }
+
     let text = '';
     try {
       const stream = await this.provider.stream({
-        system: mentorSystemPrompt(convo.topic as MentorTopic),
+        system: mentorSystemPrompt(convo.topic as MentorTopic) + groundingBlock(sources),
         turns,
         signal,
       });
       const model = stream.model;
       const placeholder = await this.db.mentorMessage.create({
-        data: { conversationId, role: 'assistant', content: '', model },
+        data: {
+          conversationId,
+          role: 'assistant',
+          content: '',
+          model,
+          ...(sources.length && { sources: sources as unknown as Prisma.InputJsonValue }),
+        },
       });
       yield { type: 'start', messageId: placeholder.id, model };
+      if (sources.length) yield { type: 'sources', sources };
       for await (const chunk of stream.chunks) {
         if (signal.aborted) break;
         text += chunk;

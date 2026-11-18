@@ -9,6 +9,7 @@ import { errorMessage, fieldErrors } from '../../lib/api';
 import { Button } from '../../components/ui/Button';
 import { Field, Input } from '../../components/ui/Field';
 import { AuthShell } from './AuthShell';
+import { SocialButtons } from './SocialButtons';
 import { safeNext } from '../../lib/navigation';
 import { passwordStrength } from '../../lib/password';
 import { cn } from '../../lib/utils';
@@ -48,6 +49,7 @@ export default function Register() {
 
   return (
     <AuthShell title="Join DevHub+" subtitle="Ask, answer, pair-program and grow your reputation.">
+      <SocialButtons next={next} />
       <form onSubmit={onSubmit} className="space-y-4" noValidate>
         {errors.root && (
           <p

@@ -21,6 +21,7 @@ import { snippetRoutes } from './modules/snippets/snippets.routes.js';
 import { sessionRoutes } from './modules/sessions/sessions.routes.js';
 import { notificationRoutes, userRoutes } from './modules/users/users.routes.js';
 import { aiRoutes } from './modules/ai/ai.routes.js';
+import { searchRoutes } from './modules/search/search.routes.js';
 import type { SessionBroadcaster } from './realtime/socket.js';
 
 export const API_PREFIX = '/api/v1';
@@ -120,6 +121,7 @@ export function createApp(
   mount('/users', (ctx) => userRoutes(ctx, c));
   mount('/notifications', (ctx) => notificationRoutes(ctx, c));
   mount('/ai', (ctx) => aiRoutes(ctx, c, limiters.ai));
+  mount('/search', (ctx) => searchRoutes(ctx, c));
   app.use(API_PREFIX, api);
 
   const openapi = () =>

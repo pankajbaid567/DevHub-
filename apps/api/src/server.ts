@@ -26,19 +26,32 @@ async function main(): Promise<void> {
   await c.db.$connect();
   server.listen(env.PORT, () => {
     logger.info(
-      { port: env.PORT, ai: c.ai.isDemo ? 'demo' : env.GEMINI_MODEL, redis: Boolean(c.redis) },
+      {
+        port: env.PORT,
+        ai: c.ai.isDemo ? 'demo' : env.GEMINI_MODEL,
+        embeddings: c.search.model,
+        redis: Boolean(c.redis),
+        queue: c.queue.kind,
+        mail: c.mailer.kind,
+      },
       `DevHub+ API listening on http://localhost:${env.PORT} (docs at /docs)`,
     );
   });
 
-  // Hourly housekeeping: drop long-expired refresh tokens.
-  const purge = setInterval(() => {
-    c.tokens.purgeExpired().then(
-      (n) => n && logger.info({ purged: n }, 'expired refresh tokens purged'),
-      (err) => logger.warn({ err }, 'token purge failed'),
+  // Background work. Every replica relays its share of the outbox (SKIP LOCKED); replicas with
+  // WORKER_ENABLED also consume jobs. Repeating jobs are deduplicated across replicas by name.
+  c.outbox.start();
+  if (env.WORKER_ENABLED) {
+    c.queue.startWorker();
+    await c.queue.every('maintenance.cleanup', 3_600_000);
+    await c.queue.every('search.reconcile', 10 * 60_000);
+    // Index existing content right away on first boot (or after changing the embedder).
+    await c.queue.add(
+      'search.reconcile',
+      {},
+      { jobId: `reconcile-boot-${Math.floor(Date.now() / 60_000)}` },
     );
-  }, 3_600_000);
-  purge.unref();
+  }
 
   let shuttingDown = false;
   const shutdown = async (signal: string) => {
@@ -52,6 +65,8 @@ async function main(): Promise<void> {
     force.unref();
     try {
       await realtime?.close(); // flushes documents, closes sockets and the HTTP server
+      await c.outbox.stop();
+      await c.queue.close(); // lets running jobs finish; unfinished ones are retried elsewhere
       await c.db.$disconnect();
       c.redis?.disconnect();
       logger.info('shutdown complete');
