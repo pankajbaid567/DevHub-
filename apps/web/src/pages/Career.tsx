@@ -1,4 +1,6 @@
 import { useRef, useState } from 'react';
+import { Navigate } from 'react-router-dom';
+import { useAuth } from '../auth/context';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { FileText, Map, Plus, Sparkles, Trash2, Upload } from 'lucide-react';
 import { toast } from 'sonner';
@@ -10,7 +12,6 @@ import type {
 } from '@devhub/shared';
 import { api, errorMessage } from '../lib/api';
 import { qk } from '../lib/queryClient';
-import { useDocumentTitle } from '../lib/hooks';
 import { cn, timeAgo } from '../lib/utils';
 import { Badge, Card, ErrorState, SegmentedControl, Skeleton } from '../components/ui/primitives';
 import { Button } from '../components/ui/Button';
@@ -119,7 +120,7 @@ function ReviewView({ review }: { review: ResumeReviewDto }) {
   );
 }
 
-function ResumeReviewer() {
+export function ResumeReviewer() {
   const qc = useQueryClient();
   const [mode, setMode] = useState<'upload' | 'paste'>('upload');
   const [file, setFile] = useState<File | null>(null);
@@ -274,7 +275,7 @@ function ResumeReviewer() {
   );
 }
 
-function Skills() {
+export function Skills() {
   const {
     data: saved,
     isPending,
@@ -454,29 +455,8 @@ function SkillsEditor({ initial }: { initial: SkillDto[] }) {
   );
 }
 
+/** Legacy route: the career tools now live on the user's own profile. */
 export default function Career() {
-  const [tab, setTab] = useState<'resume' | 'skills'>('resume');
-  useDocumentTitle('Resume & skills');
-  return (
-    <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6">
-      <div className="flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold">Career toolkit</h1>
-          <p className="mt-1 text-sm text-muted">
-            AI-assisted resume reviews and skill roadmaps. Your documents are only visible to you.
-          </p>
-        </div>
-        <SegmentedControl
-          label="Tool"
-          value={tab}
-          onChange={setTab}
-          options={[
-            { value: 'resume', label: 'Resume review' },
-            { value: 'skills', label: 'Skills & roadmap' },
-          ]}
-        />
-      </div>
-      <div className="mt-6">{tab === 'resume' ? <ResumeReviewer /> : <Skills />}</div>
-    </div>
-  );
+  const { user } = useAuth();
+  return <Navigate to={user ? `/u/${user.username}?tab=resume` : '/login'} replace />;
 }

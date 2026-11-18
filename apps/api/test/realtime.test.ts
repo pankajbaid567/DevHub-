@@ -187,3 +187,76 @@ describe('collaboration', () => {
     expect((await status).status).toBe('ENDED');
   });
 });
+
+describe('WebRTC signalling', () => {
+  it('lets participants join a call and relays signals only between call members', async () => {
+    const host = await registerUser(app);
+    const guest = await registerUser(app);
+    const outsider = await registerUser(app);
+    const sessionId = await liveSession(host, guest);
+    // The outsider is a member of a *different* session.
+    const other = await request(app)
+      .post('/api/v1/sessions')
+      .set(auth(outsider))
+      .send({ title: 'Somewhere else' })
+      .expect(201);
+
+    const [a, b, x] = await Promise.all([
+      client(host.token),
+      client(guest.token),
+      client(outsider.token),
+    ]);
+    await a.emitWithAck('session:join', { sessionId });
+    await b.emitWithAck('session:join', { sessionId });
+    await x.emitWithAck('session:join', { sessionId: other.body.id });
+
+    const joinA = await a.emitWithAck('rtc:join', { sessionId, audio: true, video: true });
+    expect(joinA.ok && joinA.data.peers).toEqual([]);
+    expect(joinA.ok && joinA.data.iceServers[0]!.urls.length).toBeGreaterThan(0);
+
+    const peerJoined = once(a, 'rtc:peer-joined');
+    const joinB = await b.emitWithAck('rtc:join', { sessionId, audio: true, video: false });
+    expect(joinB.ok && joinB.data.peers.map((p) => p.socketId)).toEqual([a.id]);
+    expect((await peerJoined).peer).toMatchObject({ socketId: b.id, audio: true, video: false });
+
+    // The outsider cannot join this call, and their signals are dropped.
+    const denied = await x.emitWithAck('rtc:join', { sessionId, audio: true, video: true });
+    expect(denied).toMatchObject({ ok: false, code: 'FORBIDDEN' });
+    let leaked = false;
+    a.on('rtc:signal', (p) => {
+      if (p.description?.sdp === 'evil') leaked = true;
+    });
+    x.emit('rtc:signal', { sessionId, to: a.id!, description: { type: 'offer', sdp: 'evil' } });
+
+    // A legitimate offer reaches exactly the addressed peer, stamped with the sender.
+    const offer = once(b, 'rtc:signal');
+    a.emit('rtc:signal', { sessionId, to: b.id!, description: { type: 'offer', sdp: 'v=0 test' } });
+    expect(await offer).toMatchObject({
+      sessionId,
+      from: a.id,
+      description: { type: 'offer', sdp: 'v=0 test' },
+    });
+
+    const state = once(a, 'rtc:state');
+    b.emit('rtc:state', { sessionId, audio: false, video: false, screen: true });
+    expect(await state).toMatchObject({ socketId: b.id, audio: false, screen: true });
+
+    const left = once(a, 'rtc:peer-left');
+    const bId = b.id;
+    b.disconnect();
+    expect((await left).socketId).toBe(bId);
+    await new Promise((r) => setTimeout(r, 100));
+    expect(leaked).toBe(false);
+  });
+
+  it('refuses calls in sessions that are not live', async () => {
+    const host = await registerUser(app);
+    const guest = await registerUser(app);
+    const sessionId = await liveSession(host, guest);
+    await request(app).post(`/api/v1/sessions/${sessionId}/end`).set(auth(host)).expect(200);
+    const a = await client(host.token);
+    await a.emitWithAck('session:join', { sessionId });
+    const res = await a.emitWithAck('rtc:join', { sessionId, audio: true, video: true });
+    expect(res).toMatchObject({ ok: false, code: 'SESSION_NOT_LIVE' });
+  });
+});

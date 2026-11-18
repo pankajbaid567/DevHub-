@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, type Browser } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 import { signUp, uid } from './helpers';
 
@@ -109,4 +109,84 @@ test.describe('accessibility', () => {
       expect(serious.map((v) => `${v.id}: ${v.nodes.length} nodes`)).toEqual([]);
     });
   }
+});
+
+test.describe('session workspace', () => {
+  async function liveRoomFor2(browser: Browser) {
+    const opts = { permissions: ['camera', 'microphone'] };
+    const host = await (await browser.newContext(opts)).newPage();
+    const guest = await (await browser.newContext(opts)).newPage();
+    await signUp(host);
+    await signUp(guest);
+    await host.goto('/sessions/new');
+    await host.getByLabel('Title').fill(`Workspace ${uid()}`);
+    await host.getByRole('button', { name: 'Go live' }).click();
+    await expect(host.locator('.monaco-editor')).toBeVisible({ timeout: 30_000 });
+    await guest.goto(host.url());
+    await guest.getByRole('button', { name: 'Join session' }).click();
+    await expect(guest.locator('.monaco-editor')).toBeVisible({ timeout: 30_000 });
+    return { host, guest };
+  }
+
+  test('a stroke drawn on the whiteboard appears for the other participant', async ({
+    browser,
+  }) => {
+    const { host, guest } = await liveRoomFor2(browser);
+    for (const p of [host, guest]) await p.getByRole('tab', { name: 'Whiteboard' }).click();
+    const board = host.getByTestId('whiteboard');
+    const box = (await board.boundingBox())!;
+    await host.mouse.move(box.x + 60, box.y + 60);
+    await host.mouse.down();
+    for (let i = 1; i <= 10; i++) await host.mouse.move(box.x + 60 + i * 20, box.y + 60 + i * 8);
+    await host.mouse.up();
+    await expect(host.getByTestId('whiteboard')).toHaveAttribute('data-stroke-count', '1');
+    await expect(guest.getByTestId('whiteboard')).toHaveAttribute('data-stroke-count', '1');
+
+    await host.getByRole('button', { name: 'Undo' }).click();
+    await expect(guest.getByTestId('whiteboard')).toHaveAttribute('data-stroke-count', '0');
+  });
+
+  test('two participants see and hear each other in a video call', async ({ browser }) => {
+    const { host, guest } = await liveRoomFor2(browser);
+    await host.getByRole('button', { name: 'Join video call' }).click();
+    await expect(host.getByTestId('call-tile-local')).toBeVisible();
+    await guest.getByRole('button', { name: 'Join video call' }).click();
+
+    // Each side receives a live remote video track (fake camera = moving test pattern).
+    for (const page of [host, guest]) {
+      const remote = page.getByTestId('call-tile-remote').locator('video');
+      await expect(remote).toHaveCount(1, { timeout: 20_000 });
+      await expect
+        .poll(
+          () =>
+            remote.evaluate(
+              (v: HTMLVideoElement) => v.videoWidth * Number(v.srcObject instanceof MediaStream),
+            ),
+          { timeout: 20_000 },
+        )
+        .toBeGreaterThan(0);
+    }
+
+    // Mute state propagates to the other side.
+    await guest.getByRole('button', { name: 'Mute microphone' }).click();
+    await expect(host.getByTestId('call-tile-remote').getByLabel('Muted')).toBeVisible();
+
+    await guest.getByRole('button', { name: 'Leave call' }).click();
+    await expect(host.getByTestId('call-tile-remote')).toHaveCount(0);
+  });
+});
+
+test('resume review and skills live on your own profile only', async ({ page }) => {
+  const name = await signUp(page);
+  await page.goto(`/u/${name}?tab=resume`);
+  await expect(page.getByRole('radio', { name: 'AI resume review' })).toHaveAttribute(
+    'aria-checked',
+    'true',
+  );
+  await expect(page.getByRole('button', { name: 'Review my resume' })).toBeVisible();
+  await page.getByRole('radio', { name: 'Skills & roadmap' }).click();
+  await expect(page.getByRole('button', { name: 'Generate roadmap' })).toBeVisible();
+
+  await page.goto('/u/ada?tab=resume'); // someone else's profile
+  await expect(page.getByRole('radio', { name: 'AI resume review' })).toHaveCount(0);
 });

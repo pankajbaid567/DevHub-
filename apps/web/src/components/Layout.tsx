@@ -133,7 +133,7 @@ function UserMenu() {
           <Link to={`/u/${user.username}`} className={item}>
             <User className="h-4 w-4" /> Profile
           </Link>
-          <Link to="/career" className={item}>
+          <Link to={`/u/${user.username}?tab=resume`} className={item}>
             <Sparkles className="h-4 w-4" /> Resume & skills
           </Link>
           <hr className="my-1 border-line" />

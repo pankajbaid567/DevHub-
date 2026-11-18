@@ -31,7 +31,7 @@ const FEATURES = [
   {
     icon: Users,
     title: 'Live collaborative coding',
-    body: 'Pair-program in a shared Monaco editor synced with CRDTs, with presence, cursors and chat.',
+    body: 'Pair-program in a shared Monaco editor and whiteboard synced with CRDTs, with a peer-to-peer video call, cursors and chat.',
   },
   {
     icon: Bot,
@@ -51,7 +51,7 @@ const FEATURES = [
   {
     icon: ShieldCheck,
     title: 'Built like production',
-    body: 'Rotating refresh tokens, rate limits, input validation everywhere, observability and 90+ automated tests.',
+    body: 'Rotating refresh tokens, rate limits, input validation everywhere, observability and 100+ automated tests.',
   },
 ];
 

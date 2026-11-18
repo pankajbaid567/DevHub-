@@ -7,6 +7,8 @@ import {
   type Ack,
   type ChatMessageDto,
   type ClientToServerEvents,
+  type IceServer,
+  type RtcPeer,
   type ParticipantRole,
   type PresenceEntry,
   type ServerToClientEvents,
@@ -25,6 +27,10 @@ interface SocketData {
   /** Sessions this socket joined, with the user's role in each. */
   sessions: Record<string, ParticipantRole>;
   chat: { windowStart: number; count: number };
+  /** The call this socket is in (one at a time), with its media state. */
+  rtc: { sessionId: string; audio: boolean; video: boolean; screen: boolean } | null;
+  /** Peers already verified as members of the same call (avoids a cluster lookup per ICE candidate). */
+  rtcVerified: Set<string>;
 }
 
 interface InterServerEvents {
@@ -96,6 +102,8 @@ export function attachRealtime(httpServer: HttpServer, c: Container) {
       socket.data.exp = claims.exp;
       socket.data.sessions = {};
       socket.data.chat = { windowStart: Date.now(), count: 0 };
+      socket.data.rtc = null;
+      socket.data.rtcVerified = new Set();
       next();
     } catch {
       next(new Error('UNAUTHENTICATED'));
@@ -132,7 +140,30 @@ export function attachRealtime(httpServer: HttpServer, c: Container) {
     });
   }
 
+  /** Participants of a session's call, cluster-wide (works across replicas via the Redis adapter). */
+  async function callPeers(sessionId: string): Promise<RtcPeer[]> {
+    const sockets = await io.in(room(sessionId)).fetchSockets();
+    return sockets
+      .filter((s) => s.data.rtc?.sessionId === sessionId && s.data.user)
+      .map((s) => {
+        const { role: _r, ...summary } = s.data.user;
+        const { audio, video, screen } = s.data.rtc!;
+        return { socketId: s.id, user: summary, audio, video, screen };
+      });
+  }
+
+  function leaveCall(socket: ClientSocket): void {
+    const call = socket.data.rtc;
+    if (!call) return;
+    socket.data.rtc = null;
+    socket.data.rtcVerified.clear();
+    socket
+      .to(room(call.sessionId))
+      .emit('rtc:peer-left', { sessionId: call.sessionId, socketId: socket.id });
+  }
+
   async function leave(socket: ClientSocket, sessionId: string): Promise<void> {
+    if (socket.data.rtc?.sessionId === sessionId) leaveCall(socket);
     if (!socket.data.sessions[sessionId]) return;
     delete socket.data.sessions[sessionId];
     await socket.leave(room(sessionId));
@@ -227,10 +258,98 @@ export function attachRealtime(httpServer: HttpServer, c: Container) {
         .emit('chat:typing', { sessionId, user: summary, isTyping: Boolean(isTyping) });
     });
 
+    // ------------------------------------------------------------- WebRTC signalling
+    // Media flows peer-to-peer; the server only relays offers/answers/ICE candidates between
+    // members of the same call, so a stranger can never inject themselves into a call.
+    on('rtc:join', async ({ sessionId, audio, video }, ack) => {
+      if (!socket.data.sessions[sessionId])
+        throw new AppError(403, 'FORBIDDEN', 'Join the session first');
+      if (statusCache.get(sessionId) !== 'LIVE')
+        throw new AppError(
+          409,
+          'SESSION_NOT_LIVE',
+          'Calls are only available while the session is live',
+        );
+      if (socket.data.rtc) leaveCall(socket);
+      const peers = await callPeers(sessionId);
+      if (peers.length >= REALTIME_LIMITS.maxCallParticipants) {
+        throw new AppError(
+          409,
+          'SESSION_FULL',
+          `Calls are limited to ${REALTIME_LIMITS.maxCallParticipants} people`,
+        );
+      }
+      socket.data.rtc = { sessionId, audio: Boolean(audio), video: Boolean(video), screen: false };
+      const { role: _r, ...summary } = user;
+      socket.to(room(sessionId)).emit('rtc:peer-joined', {
+        sessionId,
+        peer: {
+          socketId: socket.id,
+          user: summary,
+          audio: Boolean(audio),
+          video: Boolean(video),
+          screen: false,
+        },
+      });
+      ack({ ok: true, data: { peers, iceServers: iceServers() } });
+    });
+
+    on('rtc:leave', ({ sessionId }) => {
+      if (socket.data.rtc?.sessionId === sessionId) leaveCall(socket);
+    });
+
+    on('rtc:signal', async ({ sessionId, to, description, candidate }) => {
+      if (socket.data.rtc?.sessionId !== sessionId || typeof to !== 'string') return;
+      if (JSON.stringify(description ?? candidate ?? '').length > REALTIME_LIMITS.maxSignalBytes)
+        return;
+      if (!socket.data.rtcVerified.has(to)) {
+        const peers = await callPeers(sessionId);
+        if (!peers.some((p) => p.socketId === to)) return;
+        socket.data.rtcVerified.add(to);
+      }
+      io.to(to).emit('rtc:signal', {
+        sessionId,
+        from: socket.id,
+        ...(description && { description }),
+        ...(candidate && { candidate }),
+      });
+    });
+
+    on('rtc:state', ({ sessionId, audio, video, screen }) => {
+      if (socket.data.rtc?.sessionId !== sessionId) return;
+      socket.data.rtc = {
+        sessionId,
+        audio: Boolean(audio),
+        video: Boolean(video),
+        screen: Boolean(screen),
+      };
+      socket.to(room(sessionId)).emit('rtc:state', {
+        sessionId,
+        socketId: socket.id,
+        audio: Boolean(audio),
+        video: Boolean(video),
+        screen: Boolean(screen),
+      });
+    });
+
     socket.on('disconnecting', () => {
+      leaveCall(socket);
       for (const sessionId of Object.keys(socket.data.sessions)) void leave(socket, sessionId);
     });
   });
+
+  /** STUN (and optional TURN) servers; only handed to authenticated call participants. */
+  function iceServers(): IceServer[] {
+    const servers: IceServer[] = [{ urls: c.env.STUN_URLS }];
+    if (c.env.TURN_URL) {
+      servers.push({
+        urls: c.env.TURN_URL,
+        ...(c.env.TURN_USERNAME && { username: c.env.TURN_USERNAME }),
+        ...(c.env.TURN_CREDENTIAL && { credential: c.env.TURN_CREDENTIAL }),
+      });
+    }
+    return servers;
+  }
 
   // Notifications reach every open tab of the recipient, on any instance.
   c.notifications.setPusher((userId, n) => io.to(userRoom(userId)).emit('notification:new', n));
@@ -239,6 +358,7 @@ export function attachRealtime(httpServer: HttpServer, c: Container) {
     status(sessionId, status) {
       statusCache.set(sessionId, status);
       io.to(room(sessionId)).emit('session:status', { sessionId, status });
+      // Clients leave the call when they see ENDED; new joins are refused for non-live sessions.
       if (status === 'ENDED') void docs.flush(sessionId);
     },
     message(m) {

@@ -21,7 +21,8 @@ import type {
 import { api, errorMessage } from '../lib/api';
 import { qk, queryClient } from '../lib/queryClient';
 import { useAuth } from '../auth/context';
-import { useDocumentTitle } from '../lib/hooks';
+import { useDocumentTitle, useUrlState } from '../lib/hooks';
+import { ResumeReviewer, Skills } from './Career';
 import { displayName } from '../lib/utils';
 import {
   Avatar,
@@ -117,7 +118,14 @@ function EditProfile({ open, onClose }: { open: boolean; onClose: () => void }) 
 export default function Profile() {
   const { username = '' } = useParams();
   const { user } = useAuth();
-  const [tab, setTab] = useState<'questions' | 'snippets'>('questions');
+  const isMe = user?.username === username.toLowerCase();
+  const [url, setUrl] = useUrlState({ tab: 'questions' });
+  type Tab = 'questions' | 'snippets' | 'resume' | 'skills';
+  const allowed: Tab[] = isMe
+    ? ['questions', 'snippets', 'resume', 'skills']
+    : ['questions', 'snippets'];
+  const tab: Tab = allowed.includes(url.tab as Tab) ? (url.tab as Tab) : 'questions';
+  const setTab = (t: Tab) => setUrl({ tab: t });
   const [editing, setEditing] = useState(false);
   const {
     data: p,
@@ -186,7 +194,7 @@ export default function Profile() {
               })}
             </p>
           </div>
-          {user?.username === p.username && (
+          {isMe && (
             <Button
               variant="outline"
               icon={<Pencil className="h-4 w-4" />}
@@ -254,10 +262,25 @@ export default function Profile() {
           options={[
             { value: 'questions', label: 'Questions' },
             { value: 'snippets', label: 'Snippets' },
+            ...(isMe
+              ? [
+                  { value: 'resume' as const, label: 'AI resume review' },
+                  { value: 'skills' as const, label: 'Skills & roadmap' },
+                ]
+              : []),
           ]}
         />
+        {(tab === 'resume' || tab === 'skills') && (
+          <p className="mt-3 text-xs text-muted">
+            Only you can see this tab. Uploaded resumes are never shown on your public profile.
+          </p>
+        )}
         <div className="mt-4">
-          {tab === 'questions' ? (
+          {tab === 'resume' ? (
+            <ResumeReviewer />
+          ) : tab === 'skills' ? (
+            <Skills />
+          ) : tab === 'questions' ? (
             questions.isPending ? (
               <Skeleton className="h-40" />
             ) : questions.data?.items.length ? (

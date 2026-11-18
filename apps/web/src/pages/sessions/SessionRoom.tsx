@@ -3,6 +3,9 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   ArrowLeft,
+  Code2,
+  PenTool,
+  Video,
   Copy,
   Crown,
   Lock,
@@ -31,8 +34,111 @@ import { Avatar, Badge, Card, ErrorState, Skeleton } from '../../components/ui/p
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Field';
 import { PageSpinner } from '../../components/ui/Spinner';
+import { CallPanel } from '../../components/CallPanel';
+import { useSessionDoc } from '../../lib/useSessionDoc';
+import { useCall } from '../../lib/useCall';
 
 const CollabEditor = lazy(() => import('../../components/CollabEditor'));
+const Whiteboard = lazy(() => import('../../components/Whiteboard'));
+
+interface WorkspaceProps {
+  sessionId: string;
+  language: string;
+  live: boolean;
+  readOnly: boolean;
+  isHost: boolean;
+  me: { id: string; name: string };
+  profile: { username: string; displayName: string | null };
+  onPresence: (p: PresenceEntry[]) => void;
+  onConnectionChange: (connected: boolean) => void;
+}
+
+/**
+ * The participant workspace: one live Yjs document shared by the code editor and the
+ * whiteboard, plus an optional peer-to-peer video call. Mounted only for participants,
+ * because joining the document requires membership.
+ */
+function Workspace({
+  sessionId,
+  language,
+  live,
+  readOnly,
+  isHost,
+  me,
+  profile,
+  onPresence,
+  onConnectionChange,
+}: WorkspaceProps) {
+  const session = useSessionDoc({ sessionId, me, onPresence, onConnectionChange });
+  const call = useCall(sessionId);
+  const { leave } = call;
+  const [view, setView] = useState<'code' | 'board'>('code');
+
+  // The host ended the session: hang up.
+  useEffect(() => {
+    if (!live) leave();
+  }, [live, leave]);
+  useEffect(() => {
+    if (call.error) toast.error(call.error);
+  }, [call.error]);
+
+  return (
+    <div className="flex min-h-0 flex-col gap-3">
+      {call.joined && <CallPanel call={call} me={profile} />}
+      <Card className="flex min-h-[24rem] flex-1 flex-col overflow-hidden">
+        <div className="flex items-center gap-1 border-b border-line px-2">
+          <div role="tablist" aria-label="Workspace" className="flex">
+            {(
+              [
+                ['code', 'Code', Code2],
+                ['board', 'Whiteboard', PenTool],
+              ] as const
+            ).map(([v, label, Icon]) => (
+              <button
+                key={v}
+                role="tab"
+                aria-selected={view === v}
+                onClick={() => setView(v)}
+                className={cn(
+                  'flex items-center gap-1.5 px-3 py-2.5 text-sm font-medium',
+                  view === v ? 'border-b-2 border-accent text-fg' : 'text-muted hover:text-fg',
+                )}
+              >
+                <Icon className="h-4 w-4" /> {label}
+              </button>
+            ))}
+          </div>
+          {live && !call.joined && (
+            <Button
+              size="sm"
+              variant="outline"
+              className="my-1.5 ml-auto"
+              loading={call.joining}
+              onClick={() => void call.join()}
+              icon={<Video className="h-4 w-4" />}
+            >
+              Join video call
+            </Button>
+          )}
+        </div>
+        <div className="relative min-h-0 flex-1">
+          {session ? (
+            <Suspense fallback={<Skeleton className="h-full w-full rounded-none" />}>
+              <div className={view === 'code' ? 'h-full' : 'hidden'}>
+                <CollabEditor session={session} language={language} readOnly={readOnly} />
+              </div>
+              <div className={view === 'board' ? 'h-full' : 'hidden'}>
+                <Whiteboard session={session} readOnly={readOnly} canClear={isHost} me={me} />
+              </div>
+            </Suspense>
+          ) : (
+            <Skeleton className="h-full w-full rounded-none" />
+          )}
+        </div>
+      </Card>
+    </div>
+  );
+}
 
 function StatusBadge({ status }: { status: SessionStatus }) {
   if (status === 'LIVE')
@@ -408,18 +514,17 @@ export default function SessionRoom() {
       )}
 
       <div className="grid min-h-0 flex-1 gap-3 lg:grid-cols-[1fr_22rem]">
-        <Card className="min-h-[24rem] overflow-hidden">
-          <Suspense fallback={<Skeleton className="h-full w-full rounded-none" />}>
-            <CollabEditor
-              sessionId={id}
-              language={s.language}
-              readOnly={!live || s.myRole === 'VIEWER'}
-              me={me}
-              onPresence={onPresence}
-              onConnectionChange={setConnected}
-            />
-          </Suspense>
-        </Card>
+        <Workspace
+          sessionId={id}
+          language={s.language}
+          live={live}
+          readOnly={!live || s.myRole === 'VIEWER'}
+          isHost={isHost}
+          me={me}
+          profile={{ username: user?.username ?? '', displayName: user?.displayName ?? null }}
+          onPresence={onPresence}
+          onConnectionChange={setConnected}
+        />
         <Card className="flex min-h-[20rem] flex-col overflow-hidden">
           <div role="tablist" className="flex border-b border-line">
             {(['chat', 'people'] as const).map((t) => (

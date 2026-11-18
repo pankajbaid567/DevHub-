@@ -24,6 +24,8 @@ export function toBytes(value: unknown): Uint8Array {
 
 interface Entry {
   doc: Y.Doc;
+  /** Running estimate of the encoded document size; recalibrated on every flush. */
+  bytes: number;
   /** Sockets on this instance currently editing the document. */
   refs: number;
   dirty: boolean;
@@ -70,7 +72,13 @@ export class DocManager {
         const saved = await this.store.loadDocument(sessionId);
         if (saved?.state) Y.applyUpdate(doc, saved.state);
         else if (saved?.code) doc.getText(DOC_TEXT).insert(0, saved.code);
-        const entry: Entry = { doc, refs: 0, dirty: false, timer: null };
+        const entry: Entry = {
+          doc,
+          bytes: saved?.state?.byteLength ?? 0,
+          refs: 0,
+          dirty: false,
+          timer: null,
+        };
         this.docs.set(sessionId, entry);
         this.loading.delete(sessionId);
         return entry;
@@ -92,6 +100,7 @@ export class DocManager {
   applyUpdate(sessionId: string, update: Uint8Array): boolean {
     const entry = this.docs.get(sessionId);
     if (!entry || update.byteLength > REALTIME_LIMITS.maxDocUpdateBytes) return false;
+    if (entry.bytes + update.byteLength > REALTIME_LIMITS.maxDocBytes) return false;
     try {
       // An update cannot insert more characters than it has bytes, so the (O(doc)) probe on a
       // scratch copy is only needed when this update could push the document past the limit.
@@ -105,6 +114,7 @@ export class DocManager {
         if (tooBig) return false;
       }
       Y.applyUpdate(entry.doc, update);
+      entry.bytes += update.byteLength;
     } catch (err) {
       this.logger.warn({ err, sessionId }, 'rejected malformed Yjs update');
       return false;
@@ -119,6 +129,7 @@ export class DocManager {
     if (!entry) return; // not loaded here: it will be read from the database when needed
     try {
       Y.applyUpdate(entry.doc, update);
+      entry.bytes += update.byteLength;
       this.markDirty(sessionId, entry);
     } catch (err) {
       this.logger.warn({ err, sessionId }, 'failed to apply remote update');
@@ -141,6 +152,7 @@ export class DocManager {
     try {
       const merged = await this.store.mergeDocument(sessionId, Y.encodeStateAsUpdate(entry.doc));
       Y.applyUpdate(entry.doc, merged, 'persistence'); // catch up with other instances' edits
+      entry.bytes = merged.byteLength;
     } catch (err) {
       entry.dirty = true; // retry on the next flush
       this.logger.error({ err, sessionId }, 'failed to persist session document');
