@@ -206,7 +206,10 @@ async function main() {
       { verified: true },
     );
     await c.users.updateProfile(user.id, { bio: u.bio });
-    users.set(u.username, { id: user.id, role: 'USER' });
+    // The demo account is an admin, so the moderation queue can be explored.
+    if (u.username === 'ada')
+      await c.db.user.update({ where: { id: user.id }, data: { role: 'ADMIN' } });
+    users.set(u.username, { id: user.id, role: u.username === 'ada' ? 'ADMIN' : 'USER' });
   }
   const u = (name: string) => users.get(name)!;
 

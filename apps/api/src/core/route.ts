@@ -10,7 +10,8 @@ export interface RouteDef {
   path: string;
   summary: string;
   tag: string;
-  auth?: 'required' | 'optional' | 'none';
+  /** 'admin' = signed in with the ADMIN role (403 otherwise). */
+  auth?: 'required' | 'optional' | 'admin' | 'none';
   body?: ZodType;
   query?: ZodObject;
   params?: ZodObject;
@@ -27,6 +28,7 @@ export interface RouteContext {
   prefix: string;
   requireAuth: RequestHandler;
   optionalAuth: RequestHandler;
+  requireAdmin: RequestHandler;
 }
 
 const toOpenApiPath = (p: string) => p.replace(/:(\w+)/g, '{$1}');
@@ -39,6 +41,7 @@ export function defineRoute(ctx: RouteContext, def: RouteDef): void {
   const auth = def.auth ?? 'none';
   const chain: RequestHandler[] = [];
   if (auth === 'required') chain.push(ctx.requireAuth);
+  if (auth === 'admin') chain.push(ctx.requireAuth, ctx.requireAdmin);
   if (auth === 'optional') chain.push(ctx.optionalAuth);
   chain.push(...(def.middleware ?? []));
   if (def.body || def.query || def.params) {
@@ -52,14 +55,16 @@ export function defineRoute(ctx: RouteContext, def: RouteDef): void {
     responses[status] = { description };
   if (def.body || def.query || def.params)
     responses['400'] ??= { description: 'Validation failed' };
-  if (auth === 'required') responses['401'] ??= { description: 'Not signed in or token expired' };
+  if (auth === 'required' || auth === 'admin')
+    responses['401'] ??= { description: 'Not signed in or token expired' };
+  if (auth === 'admin') responses['403'] ??= { description: 'Admins only' };
 
   ctx.registry.registerPath({
     method: def.method,
     path: toOpenApiPath(ctx.prefix + (def.path === '/' ? '' : def.path)),
     summary: def.summary,
     tags: [def.tag],
-    ...(auth === 'required' && { security: [{ bearerAuth: [] }] }),
+    ...((auth === 'required' || auth === 'admin') && { security: [{ bearerAuth: [] }] }),
     request: {
       ...(def.params && { params: def.params }),
       ...(def.query && { query: def.query }),

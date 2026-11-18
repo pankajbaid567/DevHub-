@@ -43,6 +43,7 @@ Every error has the same shape:
 | Snippets | `GET /snippets?q&language&tag&author&sort`, `POST /snippets`, `GET\|PATCH\|DELETE /snippets/:id`, `PUT\|DELETE /snippets/:id/star`, `POST /snippets/:id/fork` |
 | Sessions | `GET /sessions?scope=public\|mine&status`, `POST /sessions`, `GET /sessions/:id`, `POST /sessions/:id/{join,leave,start,end,invite-code}`, `GET\|POST /sessions/:id/messages`, `GET\|POST /sessions/:id/runs` (sandboxed code execution), `GET /sessions/:id/replay?after&limit` (edit log for replay) |
 | Users | `GET /users/leaderboard`, `GET /users/me/dashboard`, `PATCH /users/me`, `GET\|PUT /users/me/skills`, `GET /users/:username` |
+| Moderation | `POST /reports`; admin only: `GET /admin/moderation`, `POST /admin/moderation/resolve` |
 | Notifications | `GET /notifications`, `POST /notifications/read` |
 | AI | `GET /ai/status`, `GET\|POST /ai/conversations`, `GET\|DELETE /ai/conversations/:id`, `POST /ai/conversations/:id/messages` (SSE), `POST /ai/code`, `GET\|POST /ai/resume-reviews` (JSON or multipart PDF), `POST /ai/skill-assessment` |
 | Operations | `GET /health`, `GET /ready`, `GET /metrics` |

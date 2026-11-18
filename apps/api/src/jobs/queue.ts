@@ -15,6 +15,8 @@ export interface JobPayloads {
   'search.reconcile': Record<string, never>;
   /** Notify participants shortly before a scheduled session starts. */
   'session.reminder': { sessionId: string };
+  /** AI triage of a user report (prioritises the moderation queue). */
+  'moderation.triage': { reportId: string };
   /** Purge expired tokens and old outbox rows. */
   'maintenance.cleanup': Record<string, never>;
 }

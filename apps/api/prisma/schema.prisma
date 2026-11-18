@@ -60,6 +60,12 @@ enum NotificationType {
   SESSION_REMINDER
 }
 
+enum ReportStatus {
+  OPEN
+  RESOLVED
+  DISMISSED
+}
+
 enum EmailTokenPurpose {
   VERIFY_EMAIL
   RESET_PASSWORD
@@ -111,6 +117,8 @@ model User {
   oauthAccounts       OAuthAccount[]
   emailTokens         EmailToken[]
   recoveryCodes       RecoveryCode[]
+  reports             Report[]             @relation("Reporter")
+  resolvedReports     Report[]             @relation("Resolver")
 
   @@index([reputation(sort: Desc)])
   @@map("users")
@@ -515,4 +523,27 @@ model RecoveryCode {
 
   @@unique([userId, codeHash])
   @@map("recovery_codes")
+}
+
+/// A user's report of a question, answer or snippet. One report per user per item.
+/// `aiTriage` holds the validated AI verdict used to prioritise the admin queue.
+model Report {
+  id           String       @id @default(cuid())
+  reporterId   String
+  targetType   String // QUESTION | ANSWER | SNIPPET
+  targetId     String
+  reason       String
+  details      String?
+  status       ReportStatus @default(OPEN)
+  aiTriage     Json?
+  resolvedById String?
+  resolution   String?
+  resolvedAt   DateTime?
+  createdAt    DateTime     @default(now())
+  reporter     User         @relation("Reporter", fields: [reporterId], references: [id], onDelete: Cascade)
+  resolvedBy   User?        @relation("Resolver", fields: [resolvedById], references: [id], onDelete: SetNull)
+
+  @@unique([reporterId, targetType, targetId])
+  @@index([status, targetType, targetId])
+  @@map("reports")
 }

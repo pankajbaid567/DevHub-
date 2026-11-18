@@ -22,6 +22,7 @@ import { sessionRoutes } from './modules/sessions/sessions.routes.js';
 import { notificationRoutes, userRoutes } from './modules/users/users.routes.js';
 import { aiRoutes } from './modules/ai/ai.routes.js';
 import { searchRoutes } from './modules/search/search.routes.js';
+import { adminRoutes, reportRoutes } from './modules/moderation/moderation.routes.js';
 import type { SessionBroadcaster } from './realtime/socket.js';
 
 export const API_PREFIX = '/api/v1';
@@ -100,7 +101,8 @@ export function createApp(
     disabled: Boolean(opts.disableRateLimits) || !c.env.RATE_LIMITS_ENABLED,
     allowlist: c.env.RATE_LIMIT_ALLOWLIST,
   });
-  const { requireAuth, optionalAuth } = authMiddleware(c.tokens);
+  const { requireAuth, optionalAuth, requireRole } = authMiddleware(c.tokens);
+  const requireAdmin = requireRole('ADMIN');
   const registry = new OpenAPIRegistry();
   registry.registerComponent('securitySchemes', 'bearerAuth', {
     type: 'http',
@@ -113,7 +115,14 @@ export function createApp(
 
   const mount = (path: string, register: (ctx: RouteContext) => void) => {
     const router = Router();
-    register({ router, registry, prefix: `${API_PREFIX}${path}`, requireAuth, optionalAuth });
+    register({
+      router,
+      registry,
+      prefix: `${API_PREFIX}${path}`,
+      requireAuth,
+      optionalAuth,
+      requireAdmin,
+    });
     api.use(path, router);
   };
 
@@ -128,6 +137,8 @@ export function createApp(
   mount('/notifications', (ctx) => notificationRoutes(ctx, c));
   mount('/ai', (ctx) => aiRoutes(ctx, c, limiters.ai));
   mount('/search', (ctx) => searchRoutes(ctx, c));
+  mount('/reports', (ctx) => reportRoutes(ctx, c));
+  mount('/admin', (ctx) => adminRoutes(ctx, c));
   app.use(API_PREFIX, api);
 
   const openapi = () =>

@@ -18,6 +18,7 @@ Please use GitHub's **private vulnerability reporting** (Security tab → *Repor
 | Refresh token replay | Rotation on every use; reuse revokes the whole token family; atomic claim prevents races | `token.service.ts` (tested) |
 | CSRF | `SameSite=Strict` cookie scoped to `/api/v1/auth`, plus a required `X-Requested-With` header; every other endpoint uses bearer tokens | `auth.routes.ts` |
 | XSS through user content and AI output | Markdown is sanitised before highlighting: no raw HTML, event handlers or `javascript:` URLs. External links get `noopener noreferrer nofollow`. Strict CSP at nginx. | `Markdown.tsx` (tested), `nginx.conf` |
+| Abuse and spam content | Reports (unique per user and item, 10 per hour), AI triage as a prioritisation signal only, admin-only resolution with an audit trail (who, when, action, note); the triage prompt treats the post as untrusted data | `moderation.service.ts` (tested) |
 | IDOR and broken access control | Central policies; owner-scoped queries; private resources return **404**, not 403, so their existence isn't revealed | `core/policies.ts`, services (tested) |
 | Socket impersonation | JWT required at handshake; identity derived server-side; per-session membership checks; token expiry enforced on every event | `realtime/socket.ts` (tested) |
 | Injection | Prisma parameterised queries; raw SQL only through tagged templates with bound parameters; `websearch_to_tsquery` for user search syntax | `questions.service.ts` |

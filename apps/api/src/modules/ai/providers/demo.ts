@@ -103,6 +103,35 @@ function demoJson(schema: Record<string, unknown>, input: string): unknown {
       ],
     };
   }
+  if ('verdict' in props) {
+    // Offline triage heuristic: links, shouting, repeated characters and spam phrases.
+    const text = input.toLowerCase();
+    const links = (text.match(/https?:\/\//g) ?? []).length;
+    const spammy = /(buy now|cheap|discount|crypto|casino|click here|free money|whatsapp)/.test(
+      text,
+    );
+    const abusive = /(idiot|stupid|moron|shut up|trash dev)/.test(text);
+    if (spammy || links >= 3)
+      return {
+        verdict: 'likely_violation',
+        category: 'spam',
+        confidence: 0.8,
+        reason: 'Promotional language or many links (demo heuristic).',
+      };
+    if (abusive)
+      return {
+        verdict: 'likely_violation',
+        category: 'abuse',
+        confidence: 0.75,
+        reason: 'Insulting language (demo heuristic).',
+      };
+    return {
+      verdict: 'likely_ok',
+      category: 'none',
+      confidence: 0.6,
+      reason: 'No spam or abuse signals found (demo heuristic).',
+    };
+  }
   if ('roadmap' in props) {
     return {
       level: 'intermediate',

@@ -89,6 +89,7 @@ const TABLES = [
   'email_tokens',
   'oauth_accounts',
   'recovery_codes',
+  'reports',
   'mentor_messages',
   'mentor_conversations',
   'resume_reviews',

@@ -20,6 +20,7 @@ import { DemoProvider } from './modules/ai/providers/demo.js';
 import { EmailTokenService } from './modules/auth/email-token.service.js';
 import { OAuthService } from './modules/auth/oauth.service.js';
 import { TwoFactorService } from './modules/auth/two-factor.service.js';
+import { ModerationService } from './modules/moderation/moderation.service.js';
 import { GeminiEmbedder, HashEmbedder, type Embedder } from './modules/search/embedder.js';
 import { SearchIndexer } from './modules/search/indexer.js';
 import { SearchService } from './modules/search/search.service.js';
@@ -63,6 +64,7 @@ export interface Container {
   search: SearchService;
   runs: RunsService;
   twoFactor: TwoFactorService;
+  moderation: ModerationService;
 }
 
 export interface ContainerOverrides {
@@ -149,9 +151,23 @@ export function createContainer(env: Env, overrides: ContainerOverrides = {}): C
       ? new HttpCodeRunner(env.CODE_RUNNER_URL, env.RUNNER_TOKEN)
       : new DisabledCodeRunner());
 
+  const ai = new AiService(db, aiProvider, logger, metrics, (text) => search.retrieve(text));
+  const questions = new QuestionsService(db, cache, events, reputation);
+  const snippets = new SnippetsService(db, events);
+  const moderation = new ModerationService(db, cache, queue, ai, questions, snippets, logger);
+
   Object.assign(
     handlers,
-    createHandlers({ db, logger, mailer, outbox, tokens, notifications, indexer }),
+    createHandlers({
+      db,
+      logger,
+      mailer,
+      outbox,
+      tokens,
+      notifications,
+      indexer,
+      moderation: () => moderation,
+    }),
   );
 
   return {
@@ -165,12 +181,13 @@ export function createContainer(env: Env, overrides: ContainerOverrides = {}): C
     tokens,
     auth: new AuthService(db, tokens, new EmailTokenService(), outbox, env.publicUrl, twoFactor),
     twoFactor,
-    questions: new QuestionsService(db, cache, events, reputation),
-    snippets: new SnippetsService(db, events),
+    questions,
+    snippets,
     sessions,
     notifications,
     users: new UsersService(db, cache),
-    ai: new AiService(db, aiProvider, logger, metrics, (text) => search.retrieve(text)),
+    ai,
+    moderation,
     queue,
     outbox,
     mailer,

@@ -206,3 +206,47 @@ test('two-factor authentication: enrol with a QR code, then sign in with a code'
   await page.getByRole('button', { name: 'Verify' }).click();
   await expect(page).toHaveURL(/\/dashboard/);
 });
+
+test('a reported answer reaches the admin queue with an AI verdict and can be removed', async ({
+  browser,
+}) => {
+  const author = await (await browser.newContext()).newPage();
+  const reporter = await (await browser.newContext()).newPage();
+  const adminPage = await (await browser.newContext()).newPage();
+  await signUp(author);
+  await signUp(reporter);
+
+  const title = `Spam target ${Date.now()}`;
+  await author.goto('/questions/ask');
+  await author.getByLabel('Title').fill(title);
+  await author
+    .getByLabel('Details')
+    .fill('Cheap crypto signals, buy now! Click here for free money today.');
+  await author.getByLabel('Tags').fill('spam');
+  await author.keyboard.press('Enter');
+  await author.getByRole('button', { name: 'Post your question' }).click();
+  await expect(author.getByRole('heading', { name: title })).toBeVisible();
+
+  await reporter.goto(author.url());
+  await reporter.getByRole('button', { name: 'Report this question' }).click();
+  await reporter.getByLabel('Spam or self-promotion').check();
+  await reporter.getByRole('button', { name: 'Send report' }).click();
+  await expect(reporter.getByText('A moderator will review it')).toBeVisible();
+
+  // The seeded demo account is an admin.
+  await adminPage.goto('/login');
+  await adminPage.getByLabel('Email').fill('ada@devhub.dev');
+  await adminPage.getByLabel('Password').fill('password123');
+  await adminPage.getByRole('button', { name: 'Sign in' }).click();
+  await expect(adminPage).toHaveURL(/\/dashboard/);
+  await adminPage.goto('/admin/moderation');
+  const card = adminPage
+    .locator('div')
+    .filter({ has: adminPage.getByRole('link', { name: title }) })
+    .last();
+  await expect(card.getByText('Likely violation')).toBeVisible({ timeout: 30_000 }); // queue refreshes every 15 s
+  await card.getByRole('button', { name: 'Remove content' }).click();
+  await expect(adminPage.getByText(/Removed \(1 report closed\)/)).toBeVisible();
+  await author.reload();
+  await expect(author.getByText(/not found/i)).toBeVisible();
+});

@@ -18,6 +18,7 @@ const ResetPassword = lazy(() => import('./pages/auth/ResetPassword'));
 const VerifyEmail = lazy(() => import('./pages/auth/VerifyEmail'));
 const AuthCallback = lazy(() => import('./pages/auth/AuthCallback'));
 const Search = lazy(() => import('./pages/Search'));
+const Moderation = lazy(() => import('./pages/admin/Moderation'));
 const Dashboard = lazy(() => import('./pages/Dashboard'));
 const Questions = lazy(() => import('./pages/questions/QuestionList'));
 const QuestionDetail = lazy(() => import('./pages/questions/QuestionDetail'));
@@ -65,6 +66,7 @@ export function App() {
                 <Route path="verify-email" element={<VerifyEmail />} />
                 <Route path="auth/callback" element={<AuthCallback />} />
                 <Route path="search" element={<Search />} />
+                <Route path="admin/moderation" element={guard(<Moderation />)} />
                 <Route path="dashboard" element={guard(<Dashboard />)} />
                 <Route path="questions" element={<Questions />} />
                 <Route path="questions/ask" element={guard(<AskQuestion />)} />

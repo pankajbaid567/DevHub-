@@ -1,6 +1,8 @@
 import { z, type ZodType } from 'zod';
 import { ErrorCode } from '@devhub/shared';
 import {
+  moderationTriageSchema,
+  type ModerationTriage,
   resumeReviewResultSchema,
   skillAssessmentResultSchema,
   type AiResultEnvelope,
@@ -26,6 +28,7 @@ import {
   groundingBlock,
   CODE_REVIEW_PROMPT,
   mentorSystemPrompt,
+  MODERATION_PROMPT,
   RESUME_PROMPT,
   SKILLS_PROMPT,
   TITLE_PROMPT,
@@ -298,6 +301,17 @@ export class AiService {
    * the response with the same zod schema. One retry on malformed output; never stores or
    * returns unvalidated model output.
    */
+  /** Classifies reported content for the moderation queue (validated structured output). */
+  async triageContent(text: string): Promise<ModerationTriage & { model: string }> {
+    const { result, model } = await this.structured(
+      MODERATION_PROMPT,
+      text.slice(0, 6_000),
+      moderationTriageSchema,
+      'moderation-triage',
+    );
+    return { ...result, model };
+  }
+
   private async structured<T>(
     system: string,
     content: string,

@@ -6,6 +6,7 @@ import type { JobHandlers } from './queue.js';
 import type { TokenService } from '../modules/auth/token.service.js';
 import type { NotificationsService } from '../modules/notifications/notifications.service.js';
 import type { SearchIndexer } from '../modules/search/indexer.js';
+import type { ModerationService } from '../modules/moderation/moderation.service.js';
 
 export interface HandlerDeps {
   db: Db;
@@ -15,6 +16,8 @@ export interface HandlerDeps {
   tokens: TokenService;
   notifications: NotificationsService;
   indexer: SearchIndexer;
+  /** Late-bound: the moderation service depends on the queue that runs this job. */
+  moderation: () => ModerationService;
 }
 
 /**
@@ -26,6 +29,8 @@ export function createHandlers(d: HandlerDeps): JobHandlers {
     'email.send': (msg) => d.mailer.send(msg),
 
     'search.index': ({ kind, id }) => d.indexer.index(kind, id),
+
+    'moderation.triage': ({ reportId }) => d.moderation().triage(reportId),
 
     'search.reconcile': async () => {
       const n = await d.indexer.reconcile();

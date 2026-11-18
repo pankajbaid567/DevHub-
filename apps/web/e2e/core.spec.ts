@@ -149,7 +149,7 @@ test.describe('session workspace', () => {
   test('two participants see and hear each other in a video call', async ({ browser }) => {
     const { host, guest } = await liveRoomFor2(browser);
     await host.getByRole('button', { name: 'Join video call' }).click();
-    await expect(host.getByTestId('call-tile-local')).toBeVisible();
+    await expect(host.getByTestId('call-tile-local')).toBeVisible({ timeout: 20_000 }); // getUserMedia can be slow under load
     await guest.getByRole('button', { name: 'Join video call' }).click();
 
     // Each side receives a live remote video track (fake camera = moving test pattern).

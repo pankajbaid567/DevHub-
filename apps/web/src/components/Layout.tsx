@@ -11,6 +11,7 @@ import {
   Moon,
   Search,
   Settings,
+  ShieldAlert,
   Sparkles,
   Sun,
   Trophy,
@@ -141,6 +142,11 @@ function UserMenu() {
           <Link to={`/u/${user.username}?tab=account`} className={item}>
             <Settings className="h-4 w-4" /> Account settings
           </Link>
+          {user.role === 'ADMIN' && (
+            <Link to="/admin/moderation" className={item}>
+              <ShieldAlert className="h-4 w-4" /> Moderation
+            </Link>
+          )}
           <hr className="my-1 border-line" />
           <button
             type="button"

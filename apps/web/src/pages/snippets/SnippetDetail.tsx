@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
+import { ReportButton } from '../../components/ReportButton';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Bot, Check, Copy, EyeOff, GitFork, Link2, Lock, Pencil, Star, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -169,6 +170,7 @@ export default function SnippetDetail() {
               </Button>
             </>
           )}
+          <ReportButton targetType="SNIPPET" targetId={s.id} authorId={s.author.id} />
         </div>
       </div>
 

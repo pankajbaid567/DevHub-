@@ -8,7 +8,7 @@
 
 [![CI](https://github.com/pankajbaid567/DevHub-/actions/workflows/ci.yml/badge.svg)](https://github.com/pankajbaid567/DevHub-/actions/workflows/ci.yml)
 ![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178c6)
-![Tests](https://img.shields.io/badge/tests-187%20passing-brightgreen)
+![Tests](https://img.shields.io/badge/tests-194%20passing-brightgreen)
 ![License](https://img.shields.io/badge/license-MIT-blue)
 
 <img src="docs/screenshots/session.png" alt="Two developers editing the same file in real time, with a remote cursor, presence and chat" width="100%" />
@@ -43,9 +43,10 @@
 | **Snippet library** | Share, star and fork code, with public, unlisted or private visibility and full-text search across title, description and code. |
 | **Accounts** | Email and password, or **Continue with GitHub / Google** (OAuth 2.0 with PKCE). Email verification, password reset by email, change or set a password, automatic linking of a social login to an existing verified email, and **two-factor authentication** (TOTP authenticator apps with a QR code, plus single-use recovery codes). |
 | **Notifications and email** | Answers, acceptances, upvotes, stars and session starts are pushed live to every open tab. Answers, acceptances and **session reminders 10 minutes before a scheduled start** are also emailed (opt-out in account settings), delivered by background jobs. |
+| **Moderation with AI triage** | Anyone can report a question, answer or snippet (one report per person, rate-limited). A background job asks Gemini for a structured verdict (likely violation, unclear or likely fine, with category, confidence and reason), which **prioritises** the admin queue; a human always decides. Removing content reverses its reputation effects exactly as if the author had deleted it. |
 | **Polished UI** | Light, dark and an optional cyberpunk theme, mobile-first layouts, optimistic updates, skeletons and empty states. WCAG AA contrast is verified with axe. |
 
-Try it locally with the seeded demo account **`ada@devhub.dev` / `password123`**.
+Try it locally with the seeded demo account **`ada@devhub.dev` / `password123`** (also an admin, so the moderation queue is reachable from the account menu).
 
 <img src="docs/screenshots/whiteboard-call.png" alt="A live session with a peer-to-peer video call and a shared whiteboard with a remote cursor" width="100%" />
 
@@ -188,15 +189,15 @@ Without a `GEMINI_API_KEY`, the AI features use a deterministic demo provider (l
 
 ## Testing
 
-There are **187 automated tests**:
+There are **194 automated tests**:
 
 | Suite | Count | Covers |
 |---|---|---|
-| API integration and unit (`apps/api/test`) | 128 | Every endpoint against a real Postgres: auth and token rotation with reuse detection, voting idempotency and concurrency, the reputation ledger, accept/un-accept, privacy rules, session capacity races, chat pagination, SSE streaming, schema-validated AI output, PDF magic bytes, sockets (authentication, CRDT sync, identity spoofing), merge-on-save persistence, WebRTC signalling isolation, Gemini fallback and circuit breaker. **Outbox:** rollback writes no job, crash replay delivers once, concurrent relays, poison-row backoff, retries. **Email verification, password reset** (single use, concurrent resets, no enumeration, all devices signed out). **OAuth:** PKCE, state mismatch, open redirect, account linking. **2FA:** the RFC 6238 vector, drift and replay, encrypted secrets, recovery codes, lockout, a challenge that is not an access token. **Semantic search:** indexing, unchanged-content skip, reconcile after a model change, concurrent indexing, duplicates, hybrid RRF, RAG citations and graceful degradation. BullMQ against real Redis. **Code runs:** pushed to the room, one-at-a-time lock, outage handling, permissions. **Replay:** only effective diffs are recorded (a reconnect's full-state resend stores nothing), authorship, a baseline for pre-existing documents, rebuilding past states. |
+| API integration and unit (`apps/api/test`) | 134 | Every endpoint against a real Postgres: auth and token rotation with reuse detection, voting idempotency and concurrency, the reputation ledger, accept/un-accept, privacy rules, session capacity races, chat pagination, SSE streaming, schema-validated AI output, PDF magic bytes, sockets (authentication, CRDT sync, identity spoofing), merge-on-save persistence, WebRTC signalling isolation, Gemini fallback and circuit breaker. **Outbox:** rollback writes no job, crash replay delivers once, concurrent relays, poison-row backoff, retries. **Email verification, password reset** (single use, concurrent resets, no enumeration, all devices signed out). **OAuth:** PKCE, state mismatch, open redirect, account linking. **Moderation:** idempotent reports, no self-reporting, rate limits, AI triage ordering the queue with one AI call per item, admin-only access, and removal keeping the ledger consistent. **2FA:** the RFC 6238 vector, drift and replay, encrypted secrets, recovery codes, lockout, a challenge that is not an access token. **Semantic search:** indexing, unchanged-content skip, reconcile after a model change, concurrent indexing, duplicates, hybrid RRF, RAG citations and graceful degradation. BullMQ against real Redis. **Code runs:** pushed to the room, one-at-a-time lock, outage handling, permissions. **Replay:** only effective diffs are recorded (a reconnect's full-state resend stores nothing), authorship, a baseline for pre-existing documents, rebuilding past states. |
 | Code runner (`apps/runner/test`) | 11 | Streams and stdin, runtime errors, infinite-loop kill, child-process group kill, output floods, environment scrubbing, per-run directories, back-pressure, token auth, validation |
 | Shared (`packages/shared`) | 8 | Reputation maths and schema normalisation |
 | Web unit and component (`apps/web/src`) | 16 | Single-flight token refresh, open-redirect guard, optimistic votes with rollback, markdown XSS sanitisation, the replay engine (timeline compression and checkpoint seeking) |
-| End-to-end (`apps/web/e2e`) | 24 | Sign-up, sign-in and session restore. The two-user Q&A loop with a live notification. **Two browsers co-editing one session.** **Whiteboard sync and undo.** **A two-way video call.** **Email verification and password reset through a real SMTP inbox (Mailpit).** **Duplicate warning while asking, hybrid search and mentor citations.** **Running code in a session, with the output shown to both participants.** **Recording a session and replaying it.** **Enrolling in 2FA with a QR code and signing in with a code.** axe accessibility checks on eight pages |
+| End-to-end (`apps/web/e2e`) | 25 | Sign-up, sign-in and session restore. The two-user Q&A loop with a live notification. **Two browsers co-editing one session.** **Whiteboard sync and undo.** **A two-way video call.** **Email verification and password reset through a real SMTP inbox (Mailpit).** **Duplicate warning while asking, hybrid search and mentor citations.** **Running code in a session, with the output shown to both participants.** **Recording a session and replaying it.** **Enrolling in 2FA with a QR code and signing in with a code.** **Reporting a post, AI triage, and an admin removing it.** axe accessibility checks on eight pages |
 
 The E2E suite also passes against the production Docker stack (nginx, two API replicas, Redis, Postgres).
 

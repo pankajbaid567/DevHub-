@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
+import { ReportButton } from '../../components/ReportButton';
 import { RelatedQuestions } from '../../components/SimilarQuestions';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Check, CheckCircle2, Eye, Pencil, Trash2 } from 'lucide-react';
@@ -177,6 +178,7 @@ function AnswerItem({
                 />
               </>
             )}
+            <ReportButton targetType="ANSWER" targetId={a.id} authorId={a.author.id} />
           </div>
           <UserChip user={a.author} size={22} meta={`answered ${timeAgo(a.createdAt)}`} />
         </div>
@@ -346,6 +348,7 @@ export default function QuestionDetail() {
                   />
                 </>
               )}
+              <ReportButton targetType="QUESTION" targetId={q.id} authorId={q.author.id} />
             </div>
             <Card className="px-3 py-2">
               <UserChip user={q.author} size={28} meta="asked" />
