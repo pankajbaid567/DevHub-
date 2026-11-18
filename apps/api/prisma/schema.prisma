@@ -77,6 +77,12 @@ model User {
   /// Null for accounts created through GitHub/Google sign-in that never set a password.
   passwordHash       String?
   emailVerifiedAt    DateTime?
+  /// TOTP second factor: AES-GCM sealed secret, set once confirmed with a valid code.
+  totpSecret         String?
+  totpPendingSecret  String?
+  totpEnabledAt      DateTime?
+  /// Last accepted time step: a code can never be used twice.
+  totpLastStep       Int?
   emailNotifications Boolean   @default(true)
   displayName        String?
   bio                String?
@@ -104,6 +110,7 @@ model User {
   codeRuns            CodeRun[]
   oauthAccounts       OAuthAccount[]
   emailTokens         EmailToken[]
+  recoveryCodes       RecoveryCode[]
 
   @@index([reputation(sort: Desc)])
   @@map("users")
@@ -495,4 +502,17 @@ model SessionUpdate {
 
   @@index([sessionId, id])
   @@map("session_updates")
+}
+
+/// Single-use 2FA recovery codes (SHA-256 only).
+model RecoveryCode {
+  id        String    @id @default(cuid())
+  userId    String
+  codeHash  String
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, codeHash])
+  @@map("recovery_codes")
 }

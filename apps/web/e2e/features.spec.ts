@@ -1,6 +1,6 @@
 import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type APIRequestContext } from '@playwright/test';
-import { signUp } from './helpers';
+import { signUp, totp } from './helpers';
 
 /** Mailpit (docker compose / CI service) captures every email the app sends. */
 const MAILPIT = process.env.MAILPIT_URL ?? 'http://localhost:8025';
@@ -156,7 +156,7 @@ test('running code in a session shows the same output to every participant', asy
 test('a session can be replayed: the code is rebuilt from the recorded edits', async ({ page }) => {
   await signUp(page);
   await page.goto('/sessions/new');
-  await page.getByLabel('Title').fill(`Replay ${Date.now()}`);
+  await page.getByLabel('Title').fill(`Recorded pairing ${Date.now()}`);
   await page.getByRole('button', { name: 'Go live' }).click();
   await expect(page.locator('.monaco-editor')).toBeVisible({ timeout: 30_000 });
   await expect(page.getByRole('tab', { name: 'People (1)' })).toBeVisible(); // joined the room
@@ -167,11 +167,42 @@ test('a session can be replayed: the code is rebuilt from the recorded edits', a
   await page.keyboard.type(' const second = 2;');
   await page.waitForTimeout(1_500); // recorder flushes every second
 
-  await page.getByRole('link', { name: 'Replay' }).click();
+  await page.getByRole('link', { name: 'Replay', exact: true }).click();
   await expect(page.getByText(/\d+ recorded edits/)).toBeVisible();
   // The start of the timeline shows an early state of the document, not the final one.
   await expect(page.locator('.view-lines')).toContainText('c');
   await expect(page.locator('.view-lines')).not.toContainText('second');
   await page.getByRole('button', { name: 'Play' }).click();
   await expect(page.locator('.view-lines')).toContainText('const second = 2;', { timeout: 15_000 });
+});
+
+test('two-factor authentication: enrol with a QR code, then sign in with a code', async ({
+  page,
+}) => {
+  const name = await signUp(page);
+  await page.goto(`/u/${name}?tab=account`);
+  await page.getByRole('button', { name: 'Set up two-factor authentication' }).click();
+  await expect(page.getByAltText('QR code for your authenticator app')).toBeVisible();
+  const secret = (await page
+    .locator('code')
+    .filter({ hasText: /^[A-Z2-7]{32}$/ })
+    .textContent())!;
+  await page.getByLabel('Code from the app').fill(await totp(secret));
+  await page.getByRole('button', { name: 'Turn on' }).click();
+  await expect(
+    page.getByRole('list', { name: 'Recovery codes' }).getByRole('listitem'),
+  ).toHaveCount(10);
+  await page.getByRole('button', { name: 'I saved them' }).click();
+  await expect(page.getByText('on', { exact: true })).toBeVisible();
+
+  await page.getByRole('button', { name: 'Account menu' }).click();
+  await page.getByRole('button', { name: 'Sign out' }).click();
+  await page.goto('/login');
+  await page.getByLabel('Email').fill(`${name}@example.com`);
+  await page.getByLabel('Password').fill('password123');
+  await page.getByRole('button', { name: 'Sign in' }).click();
+  await expect(page.getByRole('heading', { name: 'Two-factor authentication' })).toBeVisible();
+  await page.getByLabel('Authentication code').fill(await totp(secret, 1)); // enrolment used this step
+  await page.getByRole('button', { name: 'Verify' }).click();
+  await expect(page).toHaveURL(/\/dashboard/);
 });

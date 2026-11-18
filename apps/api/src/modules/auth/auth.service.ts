@@ -20,6 +20,7 @@ import { emails } from '../../jobs/emails.js';
 import type { IssuedTokens, TokenService } from './token.service.js';
 import type { EmailTokenService } from './email-token.service.js';
 import type { OAuthProfile } from './oauth.service.js';
+import type { TwoFactorService } from './two-factor.service.js';
 
 const BCRYPT_COST = 12;
 
@@ -42,6 +43,7 @@ export const currentUserSelect = {
   emailVerifiedAt: true,
   emailNotifications: true,
   passwordHash: true,
+  totpEnabledAt: true,
   oauthAccounts: { select: { provider: true } },
 } satisfies Prisma.UserSelect;
 
@@ -61,6 +63,7 @@ export const toCurrentUser = (u: CurrentUserRow): CurrentUser => ({
   hasPassword: u.passwordHash !== null,
   emailNotifications: u.emailNotifications,
   providers: u.oauthAccounts.map((a) => a.provider as OAuthProvider),
+  twoFactorEnabled: u.totpEnabledAt !== null,
 });
 
 interface ClientInfo {
@@ -69,6 +72,9 @@ interface ClientInfo {
 }
 
 type AuthResult = { user: CurrentUser; tokens: IssuedTokens };
+/** Either a session, or (2FA accounts) a challenge to complete with a code. */
+export type LoginResult =
+  ({ mfa?: undefined } & AuthResult) | { mfa: { mfaToken: string; expiresIn: number } };
 
 const isUnique = (err: unknown): err is Prisma.PrismaClientKnownRequestError =>
   err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002';
@@ -86,6 +92,7 @@ export class AuthService {
     private readonly emailTokens: EmailTokenService,
     private readonly outbox: Outbox,
     private readonly publicUrl: string,
+    private readonly twoFactor: TwoFactorService,
   ) {}
 
   private async sendVerification(
@@ -137,7 +144,7 @@ export class AuthService {
     }
   }
 
-  async login(input: LoginInput, client: ClientInfo): Promise<AuthResult> {
+  async login(input: LoginInput, client: ClientInfo): Promise<LoginResult> {
     const row = await this.db.user.findUnique({
       where: { email: input.email },
       select: currentUserSelect,
@@ -145,9 +152,17 @@ export class AuthService {
     // OAuth-only accounts have no hash: compare against the dummy so timing is identical.
     const ok = await bcrypt.compare(input.password, row?.passwordHash ?? DUMMY_HASH);
     if (!row?.passwordHash || !ok) throw new UnauthenticatedError('Invalid email or password');
+    if (row.totpEnabledAt) return { mfa: this.twoFactor.issueChallenge(row.id) };
 
     const tokens = await this.tokens.issue(row.id, row.role, client);
     return { user: toCurrentUser(row), tokens };
+  }
+
+  /** Second login step for 2FA accounts. */
+  async completeMfa(mfaToken: string, code: string, client: ClientInfo): Promise<AuthResult> {
+    const userId = await this.twoFactor.completeChallenge(mfaToken, code);
+    const user = await this.me(userId);
+    return { user, tokens: await this.tokens.issue(user.id, user.role, client) };
   }
 
   async refresh(refreshToken: string, client: ClientInfo): Promise<AuthResult> {
@@ -256,7 +271,7 @@ export class AuthService {
    *    (safe only because the provider vouches for the address);
    * 3. else a new user is created with a username derived from the profile.
    */
-  async oauthLogin(profile: OAuthProfile, client: ClientInfo): Promise<AuthResult> {
+  async oauthLogin(profile: OAuthProfile, client: ClientInfo): Promise<LoginResult> {
     const linked = await this.db.oAuthAccount.findUnique({
       where: {
         provider_providerAccountId: { provider: profile.provider, providerAccountId: profile.id },
@@ -297,6 +312,8 @@ export class AuthService {
     }
 
     const user = await this.me(userId);
+    // A linked social login is still only one factor: 2FA accounts complete the challenge.
+    if (user.twoFactorEnabled) return { mfa: this.twoFactor.issueChallenge(user.id) };
     const tokens = await this.tokens.issue(user.id, user.role, client);
     return { user, tokens };
   }

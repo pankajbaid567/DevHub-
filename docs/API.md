@@ -24,6 +24,7 @@ Every error has the same shape:
 | 401 | `UNAUTHENTICATED`, `TOKEN_EXPIRED` |
 | 403 | `FORBIDDEN` |
 | 404 | `NOT_FOUND` (also used for private resources) |
+| 200 | `POST /auth/login` returns `{ mfaRequired: true, mfaToken }` instead of a session for 2FA accounts; complete with `POST /auth/2fa/verify` |
 | 409 | `CONFLICT`, `SESSION_FULL`, `SESSION_NOT_LIVE` |
 | 413 / 415 | `PAYLOAD_TOO_LARGE`, `UNSUPPORTED_MEDIA_TYPE` |
 | 429 | `RATE_LIMITED` (with `RateLimit` headers) |
@@ -34,7 +35,7 @@ Every error has the same shape:
 
 | Area | Endpoints |
 |---|---|
-| Auth | `POST /auth/register`, `POST /auth/login`, `POST /auth/refresh`, `POST /auth/logout`, `GET /auth/me`, `POST /auth/verify-email`, `POST /auth/resend-verification`, `POST /auth/forgot-password`, `POST /auth/reset-password`, `POST /auth/change-password`, `GET /auth/providers`, `GET /auth/oauth/:provider/start`, `GET /auth/oauth/:provider/callback` |
+| Auth | `POST /auth/register`, `POST /auth/login`, `POST /auth/refresh`, `POST /auth/logout`, `GET /auth/me`, `POST /auth/verify-email`, `POST /auth/resend-verification`, `POST /auth/forgot-password`, `POST /auth/reset-password`, `POST /auth/change-password`, `GET /auth/2fa`, `POST /auth/2fa/{setup,enable,disable,verify}`, `GET /auth/providers`, `GET /auth/oauth/:provider/start`, `GET /auth/oauth/:provider/callback` |
 | Search | `GET /search?q&limit` (hybrid keyword + semantic, RRF), `GET /search/similar-questions?text&excludeId` (duplicate detection), `GET /search/related/:questionId` |
 | Questions | `GET /questions?q&tag&author&sort=newest\|active\|votes\|unanswered`, `POST /questions`, `GET\|PATCH\|DELETE /questions/:id`, `POST /questions/:id/vote`, `POST /questions/:id/answers`, `PUT /questions/:id/accepted-answer` |
 | Answers | `PATCH\|DELETE /answers/:id`, `POST /answers/:id/vote` |

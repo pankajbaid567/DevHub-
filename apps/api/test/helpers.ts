@@ -88,6 +88,7 @@ const TABLES = [
   'outbox',
   'email_tokens',
   'oauth_accounts',
+  'recovery_codes',
   'mentor_messages',
   'mentor_conversations',
   'resume_reviews',

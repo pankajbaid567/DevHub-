@@ -8,7 +8,10 @@ import {
   registerSchema,
   resetPasswordSchema,
   verifyEmailSchema,
+  mfaVerifySchema,
+  twoFactorCodeSchema,
   type AuthResponse,
+  type MfaChallengeResponse,
   type OAuthProvider,
 } from '@devhub/shared';
 import type { Container } from '../../container.js';
@@ -87,10 +90,17 @@ export function authRoutes(ctx: RouteContext, c: Container, authLimiter: Request
     summary: 'Sign in with email and password',
     body: loginSchema,
     middleware: [authLimiter],
-    responses: { 200: 'Signed in', 401: 'Invalid email or password' },
+    responses: {
+      200: 'Signed in, or { mfaRequired, mfaToken } for 2FA accounts',
+      401: 'Invalid email or password',
+    },
     handler: async (req, res) => {
-      const { user, tokens } = await c.auth.login(req.body, client(req));
-      respond(res, 200, user, tokens);
+      const result = await c.auth.login(req.body, client(req));
+      if (result.mfa) {
+        res.json({ mfaRequired: true, ...result.mfa } satisfies MfaChallengeResponse);
+        return;
+      }
+      respond(res, 200, result.user, result.tokens);
     },
   });
 
@@ -206,6 +216,88 @@ export function authRoutes(ctx: RouteContext, c: Container, authLimiter: Request
     },
   });
 
+  // ---------------------------------------------------------------- two-factor authentication
+
+  defineRoute(ctx, {
+    method: 'post',
+    path: '/2fa/verify',
+    tag: 'Auth',
+    summary: 'Second login step: exchange the MFA challenge and a code for a session',
+    body: mfaVerifySchema,
+    middleware: [authLimiter],
+    responses: {
+      200: 'Signed in',
+      400: 'Wrong code',
+      401: 'Challenge expired',
+      429: 'Locked after 5 wrong codes',
+    },
+    handler: async (req, res) => {
+      const { user, tokens } = await c.auth.completeMfa(
+        req.body.mfaToken,
+        req.body.code,
+        client(req),
+      );
+      respond(res, 200, user, tokens);
+    },
+  });
+
+  defineRoute(ctx, {
+    method: 'get',
+    path: '/2fa',
+    tag: 'Auth',
+    summary: 'Two-factor status and remaining recovery codes',
+    auth: 'required',
+    handler: async (req, res) => {
+      const me = await c.auth.me(currentUser(req).id);
+      res.json({
+        enabled: me.twoFactorEnabled,
+        recoveryCodesLeft: me.twoFactorEnabled
+          ? await c.twoFactor.remainingRecoveryCodes(me.id)
+          : 0,
+      });
+    },
+  });
+
+  defineRoute(ctx, {
+    method: 'post',
+    path: '/2fa/setup',
+    tag: 'Auth',
+    summary: 'Start enrolment: returns the secret and an otpauth:// URI for the QR code',
+    auth: 'required',
+    responses: { 200: 'Secret generated (not active until confirmed)', 409: 'Already on' },
+    handler: async (req, res) => {
+      res.json(await c.twoFactor.setup(currentUser(req).id));
+    },
+  });
+
+  defineRoute(ctx, {
+    method: 'post',
+    path: '/2fa/enable',
+    tag: 'Auth',
+    summary: 'Confirm enrolment with a code; returns 10 single-use recovery codes (shown once)',
+    auth: 'required',
+    body: twoFactorCodeSchema,
+    middleware: [authLimiter],
+    handler: async (req, res) => {
+      res.json(await c.twoFactor.enable(currentUser(req).id, req.body.code));
+    },
+  });
+
+  defineRoute(ctx, {
+    method: 'post',
+    path: '/2fa/disable',
+    tag: 'Auth',
+    summary: 'Turn two-factor off (requires a current code or a recovery code)',
+    auth: 'required',
+    body: twoFactorCodeSchema,
+    middleware: [authLimiter],
+    responses: { 204: 'Disabled', 400: 'Wrong code' },
+    handler: async (req, res) => {
+      await c.twoFactor.disable(currentUser(req).id, req.body.code);
+      res.status(204).end();
+    },
+  });
+
   // ---------------------------------------------------------------- GitHub / Google sign-in
 
   defineRoute(ctx, {
@@ -261,7 +353,17 @@ export function authRoutes(ctx: RouteContext, c: Container, authLimiter: Request
       res.clearCookie(OAUTH_COOKIE, { path: OAUTH_COOKIE_PATH });
       try {
         const profile = await c.oauth.complete(provider, req.query, stored);
-        const { tokens } = await c.auth.oauthLogin(profile, client(req));
+        const result = await c.auth.oauthLogin(profile, client(req));
+        if (result.mfa) {
+          // Second factor still required: the short-lived challenge alone cannot sign anyone in.
+          const q = new URLSearchParams({
+            mfaToken: result.mfa.mfaToken,
+            next: stored?.returnTo ?? '/',
+          });
+          res.redirect(302, `${c.env.publicUrl}/login?${q}`);
+          return;
+        }
+        const { tokens } = result;
         res.cookie(REFRESH_COOKIE, tokens.refreshToken, cookieOptions(c, tokens.refreshExpiresAt));
         // No token in the URL: the app calls /auth/refresh (cookie) to get an access token.
         const back = new URLSearchParams({ returnTo: stored?.returnTo ?? '/' });

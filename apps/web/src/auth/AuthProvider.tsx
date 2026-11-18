@@ -1,5 +1,11 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
-import type { AuthResponse, CurrentUser, LoginInput, RegisterInput } from '@devhub/shared';
+import type {
+  AuthResponse,
+  CurrentUser,
+  LoginInput,
+  LoginResponse,
+  RegisterInput,
+} from '@devhub/shared';
 import { AuthContext, type AuthStatus } from './context';
 import { api, mayHaveSession, refreshSession, session } from '../lib/api';
 import { connectSocket, disconnectSocket } from '../lib/socket';
@@ -38,7 +44,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [status]);
 
   const login = useCallback(async (input: LoginInput) => {
-    const auth = await api<AuthResponse>('/auth/login', { method: 'POST', body: input });
+    const res = await api<LoginResponse>('/auth/login', { method: 'POST', body: input });
+    if ('mfaRequired' in res) return res;
+    session.set(res);
+    return res.user;
+  }, []);
+
+  const verifyMfa = useCallback(async (mfaToken: string, code: string) => {
+    const auth = await api<AuthResponse>('/auth/2fa/verify', {
+      method: 'POST',
+      body: { mfaToken, code },
+    });
     session.set(auth);
     return auth.user;
   }, []);
@@ -63,8 +79,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const setUser = useCallback((u: CurrentUser) => session.updateUser(u), []);
 
   const value = useMemo(
-    () => ({ status, user, login, register, logout, setUser }),
-    [status, user, login, register, logout, setUser],
+    () => ({ status, user, login, verifyMfa, register, logout, setUser }),
+    [status, user, login, verifyMfa, register, logout, setUser],
   );
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

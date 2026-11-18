@@ -13,6 +13,7 @@ function wrap(ui: ReactNode, signedIn = true) {
     status: signedIn ? 'authenticated' : 'anonymous',
     user: signedIn ? ({ id: 'me', username: 'me' } as AuthContextValue['user']) : null,
     login: vi.fn(),
+    verifyMfa: vi.fn(),
     register: vi.fn(),
     logout: vi.fn(),
     setUser: vi.fn(),

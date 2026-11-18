@@ -48,6 +48,32 @@ export const changePasswordSchema = z.object({
 });
 export type ChangePasswordInput = z.infer<typeof changePasswordSchema>;
 
+/** A 6-digit authenticator code or a recovery code ("xxxxx-xxxxx"). */
+export const twoFactorCodeSchema = z.object({
+  code: z
+    .string()
+    .trim()
+    .regex(/^(\d{6}|[0-9a-f]{5}-[0-9a-f]{5})$/i, 'Enter the 6-digit code or a recovery code'),
+});
+export const mfaVerifySchema = twoFactorCodeSchema.extend({
+  mfaToken: z.string().min(20).max(1000),
+});
+
+/** Returned by login instead of a session when the account has two-factor auth on. */
+export interface MfaChallengeResponse {
+  mfaRequired: true;
+  mfaToken: string;
+  expiresIn: number;
+}
+export type LoginResponse = AuthResponse | MfaChallengeResponse;
+
+export interface TwoFactorSetupDto {
+  /** Base32 secret, for manual entry. */
+  secret: string;
+  /** otpauth:// URI, rendered as a QR code. */
+  otpauthUri: string;
+}
+
 export const OAUTH_PROVIDERS = ['github', 'google'] as const;
 export type OAuthProvider = (typeof OAUTH_PROVIDERS)[number];
 
@@ -73,6 +99,7 @@ export interface CurrentUser {
   emailNotifications: boolean;
   /** Linked sign-in providers. */
   providers: OAuthProvider[];
+  twoFactorEnabled: boolean;
 }
 
 /**

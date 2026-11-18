@@ -10,6 +10,7 @@ Please use GitHub's **private vulnerability reporting** (Security tab → *Repor
 |---|---|---|
 | Credential stuffing or brute force | Redis-backed limit on `/auth/*` (20 per 15 minutes per IP); bcrypt cost 12; NIST-style length-first password policy | `middleware/http.ts`, `shared/auth.ts` |
 | User enumeration | Identical login errors; dummy bcrypt comparison for unknown emails and for social-only accounts (constant time); `forgot-password` answers `202` whether or not the account exists | `auth.service.ts` (tested) |
+| Stolen passwords | Optional TOTP two-factor: secret AES-256-GCM sealed (HKDF key); single-use time steps (replay-proof); hashed single-use recovery codes; a 5-minute challenge JWT with a separate audience; lockout after 5 wrong codes (Redis, cluster-wide); enforced for social logins too | `two-factor.service.ts`, `totp.ts` (tested, including the RFC vector) |
 | Email-link abuse | Reset and verification tokens are 256-bit random, stored only as SHA-256 hashes, single use (atomic conditional update), short-lived (30 min / 24 h), and voided when a new one is issued. A reset revokes every refresh token. | `email-token.service.ts` (tested) |
 | OAuth login CSRF, code interception and account takeover | `state` compared with an httpOnly cookie; PKCE S256; only provider-**verified** emails are linked or used; tokens never placed in URLs; `returnTo` restricted to same-site paths | `oauth.service.ts`, ADR 0010 (tested) |
 | HTML injection in emails | Every user-controlled value in email templates is HTML-escaped | `jobs/emails.ts` (tested) |

@@ -2,7 +2,8 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation } from '@tanstack/react-query';
 import { z } from 'zod';
-import { BellRing, KeyRound, Link2, MailCheck, MailWarning } from 'lucide-react';
+import { BellRing, KeyRound, Link2, MailCheck, MailWarning, ShieldCheck } from 'lucide-react';
+import { TwoFactorSettings } from './TwoFactorSettings';
 import { toast } from 'sonner';
 import { passwordSchema, type AuthResponse, type CurrentUser } from '@devhub/shared';
 import { api, errorMessage, fieldErrors, session } from '../lib/api';
@@ -179,6 +180,10 @@ export function AccountSettings() {
             {user.hasPassword ? 'Change password' : 'Set password'}
           </Button>
         </form>
+      </Section>
+
+      <Section icon={ShieldCheck} title="Two-factor authentication">
+        <TwoFactorSettings />
       </Section>
 
       <Section icon={Link2} title="Sign-in methods">

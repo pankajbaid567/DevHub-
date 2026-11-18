@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Link, Navigate, useNavigate, useSearchParams } from 'react-router-dom';
@@ -11,12 +12,79 @@ import { AuthShell } from './AuthShell';
 import { safeNext } from '../../lib/navigation';
 import { SocialButtons } from './SocialButtons';
 
+/** Second step for accounts with two-factor authentication. */
+function MfaStep({ mfaToken, next }: { mfaToken: string; next: string }) {
+  const { verifyMfa } = useAuth();
+  const navigate = useNavigate();
+  const [code, setCode] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setBusy(true);
+    setError(null);
+    try {
+      const user = await verifyMfa(mfaToken, code);
+      toast.success(`Welcome back, ${user.displayName ?? user.username}!`);
+      navigate(next, { replace: true });
+    } catch (err) {
+      setError(errorMessage(err));
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <AuthShell
+      title="Two-factor authentication"
+      subtitle="Enter the code from your authenticator app."
+    >
+      <form onSubmit={submit} className="space-y-4" noValidate>
+        {error && (
+          <p
+            role="alert"
+            className="rounded-lg border border-danger/30 bg-danger/10 px-3 py-2 text-sm text-danger"
+          >
+            {error}
+          </p>
+        )}
+        <Field
+          label="Authentication code"
+          hint="Lost your device? Enter one of your recovery codes instead."
+        >
+          {(p) => (
+            <Input
+              {...p}
+              value={code}
+              onChange={(e) => setCode(e.target.value)}
+              inputMode="text"
+              autoComplete="one-time-code"
+              autoFocus
+              placeholder="123456"
+              className="text-center font-mono text-lg tracking-widest"
+            />
+          )}
+        </Field>
+        <Button type="submit" className="w-full" loading={busy} disabled={code.trim().length < 6}>
+          Verify
+        </Button>
+      </form>
+      <p className="mt-6 text-center text-sm text-muted">
+        <Link to="/login" className="text-accent hover:underline" reloadDocument>
+          Start over
+        </Link>
+      </p>
+    </AuthShell>
+  );
+}
+
 export default function Login() {
   const { login, status } = useAuth();
+  const [mfaToken, setMfaToken] = useState<string | null>(null);
   const navigate = useNavigate();
   const [params] = useSearchParams();
   const next = safeNext(params.get('next'));
   const oauthError = params.get('error');
+  const challenge = mfaToken ?? params.get('mfaToken');
   const {
     register,
     handleSubmit,
@@ -25,10 +93,15 @@ export default function Login() {
   } = useForm<LoginInput>({ resolver: zodResolver(loginSchema) });
 
   if (status === 'authenticated') return <Navigate to={next} replace />;
+  if (challenge) return <MfaStep mfaToken={challenge} next={next} />;
 
   const onSubmit = handleSubmit(async (values) => {
     try {
       const user = await login(values);
+      if ('mfaRequired' in user) {
+        setMfaToken(user.mfaToken);
+        return;
+      }
       toast.success(`Welcome back, ${user.displayName ?? user.username}!`);
       navigate(next, { replace: true });
     } catch (err) {

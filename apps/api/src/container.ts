@@ -19,6 +19,7 @@ import { GeminiProvider } from './modules/ai/providers/gemini.js';
 import { DemoProvider } from './modules/ai/providers/demo.js';
 import { EmailTokenService } from './modules/auth/email-token.service.js';
 import { OAuthService } from './modules/auth/oauth.service.js';
+import { TwoFactorService } from './modules/auth/two-factor.service.js';
 import { GeminiEmbedder, HashEmbedder, type Embedder } from './modules/search/embedder.js';
 import { SearchIndexer } from './modules/search/indexer.js';
 import { SearchService } from './modules/search/search.service.js';
@@ -61,6 +62,7 @@ export interface Container {
   indexer: SearchIndexer;
   search: SearchService;
   runs: RunsService;
+  twoFactor: TwoFactorService;
 }
 
 export interface ContainerOverrides {
@@ -140,6 +142,7 @@ export function createContainer(env: Env, overrides: ContainerOverrides = {}): C
       : new DemoProvider());
 
   const sessions = new SessionsService(db, events, outbox);
+  const twoFactor = new TwoFactorService(db, cache, env.JWT_ACCESS_SECRET);
   const codeRunner: CodeRunner =
     overrides.codeRunner ??
     (env.CODE_RUNNER_URL && env.RUNNER_TOKEN
@@ -160,7 +163,8 @@ export function createContainer(env: Env, overrides: ContainerOverrides = {}): C
     metrics,
     events,
     tokens,
-    auth: new AuthService(db, tokens, new EmailTokenService(), outbox, env.publicUrl),
+    auth: new AuthService(db, tokens, new EmailTokenService(), outbox, env.publicUrl, twoFactor),
+    twoFactor,
     questions: new QuestionsService(db, cache, events, reputation),
     snippets: new SnippetsService(db, events),
     sessions,
