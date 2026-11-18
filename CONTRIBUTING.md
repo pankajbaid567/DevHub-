@@ -17,6 +17,8 @@ npm run lint && npm run typecheck && npm run format:check && npm test
 npm run e2e        # needs the dev servers (started automatically if not running)
 ```
 
+`npm run db:up` also starts Redis and Mailpit. Set `TEST_REDIS_URL=redis://localhost:6379` to include the BullMQ integration test, and keep Mailpit running for the email E2E tests (they skip otherwise).
+
 CI runs the same checks, plus a schema-drift check and Docker builds.
 
 ## Conventions

@@ -36,12 +36,16 @@ HTTP request
 | **Declarative routes** | `core/route.ts` (`defineRoute`) | One definition produces the Express handler, auth, validation and the OpenAPI entry, so docs and code cannot drift. |
 | **Typed error hierarchy** | `core/errors.ts` | Services throw `NotFoundError` or `ForbiddenError`, and one middleware maps them to stable error codes. Anything else is a bug: logged, and returned as a generic 500. |
 | **Mapper / DTO** | `core/mappers.ts` and per-module `toDto` | The database shape never leaks. `userSummarySelect` makes "never return an email" structural rather than a convention. |
+| **Transactional outbox** | `jobs/outbox.ts` | Jobs are written in the caller's transaction and relayed to the queue, so side effects that must not be lost (emails, reminders) are atomic with the change. |
+| **Strategy (infrastructure)** | `JobQueue` (`BullJobQueue`, `InlineJobQueue`), `Mailer` (`SmtpMailer`, `LogMailer`), `Embedder` (`GeminiEmbedder`, `HashEmbedder`) | The same handlers and services run on Redis or in-process, SMTP or log, Gemini or offline. Tests use the in-process variants with the same rules, including BullMQ's job-id constraint. |
+| **Idempotent consumer** | `jobs/handlers.ts` | Delivery is at-least-once. Each handler checks or claims state atomically before acting. |
 | **Retry with backoff** | `core/tx.ts` (`withRetry`) | Unique-constraint and serialisation races, such as concurrent first votes, retry the whole transaction a bounded number of times. |
 
 ### Consistency rules (ADR 0004)
 
 - **Must be atomic with the action** → the same database transaction. Examples: vote rows, score counters, reputation and its ledger, `answerCount`, accepted-answer bonuses, session capacity.
-- **May lag slightly** → domain events published after commit. Examples: notifications, socket pushes, cache invalidation.
+- **May lag slightly** → domain events published after commit. Examples: notifications, socket pushes, cache invalidation, search re-indexing.
+- **Must happen eventually, even across a crash** → an outbox row in the same transaction, relayed to BullMQ. Examples: verification and reset emails, notification emails, session reminders.
 
 ## 3. Data model
 
@@ -175,6 +179,35 @@ Identity always comes from the handshake JWT. Payloads never carry a trusted use
 - **Cancellation.** If the browser disconnects, an `AbortController` cancels the model call, so no further tokens are paid for.
 - **Persistence.** The assistant message is stored when the stream completes.
 - **Structured tools.** For resume review and skills, a JSON Schema is derived from the zod schema and sent to Gemini as `responseJsonSchema`. The output is validated again with zod and retried once, and unvalidated model output is never stored.
+
+### 4.5 Email verification, password reset and social sign-in
+
+- **Email tokens:** 32 random bytes, sent only in the email. The database stores the SHA-256 hash, the purpose and the expiry (24 h to verify, 30 min to reset). Issuing a new token voids older unused ones. Consuming is one conditional `UPDATE … WHERE usedAt IS NULL AND expiresAt > now() RETURNING userId`, so a double-submitted link works once.
+- **Reset:** sets the new hash, marks the email verified (the link proves ownership) and revokes every refresh token in the same transaction. `forgot-password` returns the same `202` whether or not the account exists.
+- **OAuth (GitHub, Google):**
+
+```mermaid
+sequenceDiagram
+  participant B as Browser
+  participant A as API
+  participant P as GitHub / Google
+  B->>A: GET /auth/oauth/github/start?returnTo=/questions
+  A-->>B: 302 to provider · Set-Cookie dh_oauth {state, PKCE verifier, returnTo} (httpOnly, Lax, 10 min)
+  B->>P: authorize (state, code_challenge S256)
+  P-->>B: 302 /auth/oauth/github/callback?code&state
+  B->>A: callback (+ dh_oauth cookie)
+  A->>A: state must equal cookie (login CSRF)
+  A->>P: exchange code + code_verifier → access token → profile + verified email
+  A->>A: linked identity → that user · else same verified email → link · else create
+  A-->>B: 302 /auth/callback?returnTo=… · Set-Cookie dh_rt (refresh, Strict)
+  B->>A: POST /auth/refresh → access token (never in a URL)
+```
+
+`returnTo` must be a same-site path (`//evil.com`, absolute URLs and backslash tricks become `/`). An identity whose email the provider hasn't verified is refused, which stops account takeover by claiming someone else's address.
+
+### 4.6 Grounded mentor replies (RAG)
+
+`streamReply` embeds the question, retrieves and re-ranks community chunks (see [System design](SYSTEM_DESIGN.md#semantic-search-and-rag)), appends them to the system prompt as tagged untrusted data, then streams `start → sources → delta* → done`. Retrieval failures are logged and the reply continues ungrounded. Citations are saved in `mentor_messages.sources`, so history shows them too.
 
 ## 5. Web architecture
 

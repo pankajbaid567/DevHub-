@@ -34,7 +34,8 @@ Every error has the same shape:
 
 | Area | Endpoints |
 |---|---|
-| Auth | `POST /auth/register`, `POST /auth/login`, `POST /auth/refresh`, `POST /auth/logout`, `GET /auth/me` |
+| Auth | `POST /auth/register`, `POST /auth/login`, `POST /auth/refresh`, `POST /auth/logout`, `GET /auth/me`, `POST /auth/verify-email`, `POST /auth/resend-verification`, `POST /auth/forgot-password`, `POST /auth/reset-password`, `POST /auth/change-password`, `GET /auth/providers`, `GET /auth/oauth/:provider/start`, `GET /auth/oauth/:provider/callback` |
+| Search | `GET /search?q&limit` (hybrid keyword + semantic, RRF), `GET /search/similar-questions?text&excludeId` (duplicate detection), `GET /search/related/:questionId` |
 | Questions | `GET /questions?q&tag&author&sort=newest\|active\|votes\|unanswered`, `POST /questions`, `GET\|PATCH\|DELETE /questions/:id`, `POST /questions/:id/vote`, `POST /questions/:id/answers`, `PUT /questions/:id/accepted-answer` |
 | Answers | `PATCH\|DELETE /answers/:id`, `POST /answers/:id/vote` |
 | Tags | `GET /tags?q` |
@@ -51,7 +52,10 @@ Every error has the same shape:
 
 ```
 {"type":"start","messageId":"…","model":"gemini-3.8-flash"}
+{"type":"sources","sources":[{"n":1,"questionId":"…","questionTitle":"…","answerId":"…","accepted":true,"similarity":0.77,"excerpt":"…"}]}
 {"type":"delta","text":"Start by "}
 …
 {"type":"done","messageId":"…","title":"Debugging a slow API"}
 ```
+
+`sources` is sent only when community posts were retrieved; send `"useCommunity": false` in the request body to skip retrieval.

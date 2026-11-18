@@ -1,6 +1,6 @@
 # ADR 0005: Postgres full-text search instead of a search cluster
 
-**Status:** Accepted
+**Status:** Accepted. Extended by [ADR 0009](0009-pgvector-hybrid-search-and-rag.md) (semantic search).
 
 ## Decision
 

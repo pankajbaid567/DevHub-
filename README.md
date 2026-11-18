@@ -4,11 +4,11 @@
 
 # DevHub+
 
-**A real-time developer community: Q&A with reputation, live coding sessions with a shared editor, whiteboard and video call, a snippet library and a streaming AI mentor.**
+**A real-time developer community: Q&A with reputation, live coding sessions with a shared editor, whiteboard and video call, semantic search, and an AI mentor grounded in community answers.**
 
 [![CI](https://github.com/pankajbaid567/DevHub-/actions/workflows/ci.yml/badge.svg)](https://github.com/pankajbaid567/DevHub-/actions/workflows/ci.yml)
 ![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178c6)
-![Tests](https://img.shields.io/badge/tests-102%20passing-brightgreen)
+![Tests](https://img.shields.io/badge/tests-154%20passing-brightgreen)
 ![License](https://img.shields.io/badge/license-MIT-blue)
 
 <img src="docs/screenshots/session.png" alt="Two developers editing the same file in real time, with a remote cursor, presence and chat" width="100%" />
@@ -35,10 +35,12 @@
 | **Live collaborative coding** | A shared Monaco editor synchronised with **Yjs CRDTs** over Socket.IO, with remote cursors, presence, typing indicators and chat. Private sessions use invite codes. Capacity is enforced under a row lock, and the host can start and end sessions. |
 | **Shared whiteboard** | Draw together in the same session, with live strokes and remote cursors. It has pen, highlighter, eraser, colours and widths, per-user undo and redo (Yjs `UndoManager`), host-only clear and PNG export. It is stored in the same CRDT document as the code, so it syncs across servers and persists automatically. |
 | **Video and voice calls** | **WebRTC** peer-to-peer calls in each session, with mute, camera, screen share (switched in place with `replaceTrack`), a speaking indicator and automatic rejoin. Uses perfect negotiation, server-side signalling restricted to call members, and STUN plus optional TURN. Up to 6 people (mesh). |
-| **Streaming AI mentor** | Multi-turn conversations streamed token by token over Server-Sent Events, with topic-specific system prompts (debugging, code review, system design and more) and saved history. |
+| **AI mentor grounded in the community (RAG)** | Multi-turn conversations streamed token by token over Server-Sent Events. Before answering, the mentor retrieves the most relevant community answers (pgvector), favouring accepted and well-voted ones, and cites them inline as **[1]**, **[2]** with links to the source. You can switch grounding off per message. |
+| **Semantic search** | Hybrid search that matches words *and* meaning: Postgres full-text and pgvector results fused with reciprocal rank fusion, with a badge showing how each result matched. While you type a question, likely **duplicates** appear before you post; every question shows **related questions**. |
 | **AI resume analyser and skills** | On your own profile (private tabs): upload a resume PDF and get a Gemini-powered, schema-validated review (0–100 scores per section, ATS keywords present and missing, top actions), with review history. Self-rated skills become a phased roadmap. |
 | **Snippet library** | Share, star and fork code, with public, unlisted or private visibility and full-text search across title, description and code. |
-| **Notifications** | Answers, acceptances, upvotes, stars and session starts are pushed live to every open tab. |
+| **Accounts** | Email and password, or **Continue with GitHub / Google** (OAuth 2.0 with PKCE). Email verification, password reset by email, change or set a password, and automatic linking of a social login to an existing verified email. |
+| **Notifications and email** | Answers, acceptances, upvotes, stars and session starts are pushed live to every open tab. Answers, acceptances and **session reminders 10 minutes before a scheduled start** are also emailed (opt-out in account settings), delivered by background jobs. |
 | **Polished UI** | Light, dark and an optional cyberpunk theme, mobile-first layouts, optimistic updates, skeletons and empty states. WCAG AA contrast is verified with axe. |
 
 Try it locally with the seeded demo account **`ada@devhub.dev` / `password123`**.
@@ -55,6 +57,16 @@ These are the parts I'd point a reviewer to.
   - The capacity race for the last seat in a session is closed with `SELECT … FOR UPDATE`.
   - Document saves CRDT-merge under a row lock instead of overwriting each other.
   - The reputation ledger invariant `users.reputation = SUM(events)` is asserted after each scenario.
+- **Reliable background work.** Emails, reminders and search indexing run as BullMQ jobs on every replica (competing consumers, retries with exponential backoff, failed jobs kept as a dead-letter set).
+  - A **transactional outbox** writes each job in the same transaction as the change that causes it, so a crash can never lose a verification email or send one for a rolled-back sign-up.
+  - Relays on several replicas share the table with `FOR UPDATE SKIP LOCKED`. The outbox row id becomes the job id, so a row relayed twice is delivered once.
+  - Every handler is idempotent. A session reminder, for example, is claimed with one conditional `UPDATE … RETURNING`, so a re-delivered job can't remind twice. Tests replay crashes, race relays and run against real Redis.
+- **Retrieval-augmented AI on Postgres.** Questions, answers (chunked with overlap) and snippets are embedded with Gemini (`gemini-embedding-001`, 768 dimensions, asymmetric query and document task types) into **pgvector** with an **HNSW** index.
+  - Hybrid search fuses full-text and vector results with **RRF**.
+  - Thresholds were calibrated on real embeddings and are documented next to the code.
+  - Indexing is asynchronous and self-healing: a periodic reconcile job embeds anything missing, re-indexes everything when the model changes and drops orphans. Writers are serialised per document with an advisory lock.
+  - Retrieved posts are passed to the model as tagged, untrusted data, a prompt-injection defence.
+  - Without an API key, an offline feature-hashing embedder keeps every feature working in CI.
 - **Resilient AI integration.** Gemini sits behind a provider interface:
   - The primary model gets 60% of the time budget, and a timeout or overload falls back to a second model.
   - A circuit breaker skips a failing primary for 60 seconds.
@@ -65,10 +77,11 @@ These are the parts I'd point a reviewer to.
   - Refresh tokens are httpOnly, `SameSite=Strict` cookies that rotate on every use, with reuse detection that revokes the whole token family.
   - Every input is validated with shared zod schemas, and private content returns 404 rather than 403.
   - Markdown is sanitised, PDF uploads are checked by magic bytes, login timing is equalised, and helmet plus a strict CSP are in place.
+  - OAuth uses `state` (login CSRF) and PKCE, a whitelist for return paths (no open redirect) and no tokens in URLs. Email links carry single-use tokens stored only as SHA-256 hashes, and "forgot password" answers identically whether or not the account exists. A password reset signs out every device.
   - See [SECURITY.md](SECURITY.md).
 - **Clean architecture.**
   - A composition root wires every service through constructor injection.
-  - Strategy interfaces separate concerns: `AIProvider` (Gemini or a demo provider) and `Cache` (Redis or memory).
+  - Strategy interfaces separate concerns: `AIProvider` (Gemini or a demo provider), `Embedder` (Gemini or offline hashing), `JobQueue` (BullMQ or in-process), `Mailer` (SMTP or log) and `Cache` (Redis or memory).
   - A domain event bus (observer pattern) decouples notifications from the code that triggers them.
   - Authorisation rules live together in one policy module.
   - Each route is declared once, which produces the Express handler, the validation and the OpenAPI docs together, so they cannot drift.
@@ -90,9 +103,10 @@ flowchart LR
     API1
     API2
   end
-  API1 & API2 --> PG[("PostgreSQL<br/>data · FTS · CRDT state")]
-  API1 & API2 <--> REDIS[("Redis<br/>pub/sub · cache · rate limits")]
-  API1 & API2 --> GEMINI["Gemini API"]
+  API1 & API2 --> PG[("PostgreSQL + pgvector<br/>data · FTS · embeddings · outbox · CRDT state")]
+  API1 & API2 <--> REDIS[("Redis<br/>pub/sub · cache · rate limits · BullMQ jobs")]
+  API1 & API2 --> GEMINI["Gemini API<br/>chat · embeddings"]
+  API1 & API2 --> SMTP["SMTP<br/>(Mailpit locally)"]
 ```
 
 Inside the API, every module follows **route → service → Prisma**, with cross-cutting concerns as middleware:
@@ -104,6 +118,8 @@ flowchart TB
   S --> DB["Prisma (PostgreSQL)"]
   S -- "publish after commit" --> EB["EventBus"]
   EB --> N["NotificationsService"] --> WS["Socket.IO push"]
+  S -- "same transaction" --> OB[("Outbox table")]
+  OB -- "relay (SKIP LOCKED)" --> Q["BullMQ"] --> W["Workers<br/>email · reminders · indexing"]
   S --> AI["AIProvider (strategy)<br/>Gemini · Demo"]
   S --> C["Cache (strategy)<br/>Redis · Memory"]
 ```
@@ -115,9 +131,9 @@ There's much more in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md): the data mode
 | Layer | Choices |
 |---|---|
 | **Web** | React 19, TypeScript (strict), Vite, Tailwind CSS 4, TanStack Query, React Router 7, react-hook-form + zod, Monaco, Yjs (`y-monaco`), Socket.IO client, react-markdown + rehype-sanitize |
-| **API** | Node.js 20, Express 5, TypeScript (strict), Prisma 6, PostgreSQL 16, Socket.IO 4 + Redis adapter, ioredis, Yjs, zod, Pino, `@google/genai`, zod-to-openapi + Swagger UI |
+| **API** | Node.js 20, Express 5, TypeScript (strict), Prisma 6, PostgreSQL 16 + pgvector, Socket.IO 4 + Redis adapter, ioredis, BullMQ, Nodemailer, Yjs, zod, Pino, `@google/genai` (chat + embeddings), zod-to-openapi + Swagger UI |
 | **Quality** | Vitest, Supertest, Socket.IO client tests, React Testing Library, Playwright, axe-core, ESLint (typescript-eslint, React hooks), Prettier |
-| **Infrastructure** | Docker (multi-stage), Docker Compose, nginx, GitHub Actions |
+| **Infrastructure** | Docker (multi-stage), Docker Compose, nginx, Mailpit, GitHub Actions |
 
 ## Quick start
 
@@ -129,7 +145,7 @@ cp .env.example .env
 docker compose up --build            # add --scale api=3 to run 3 API replicas
 ```
 
-Open http://localhost:8080 and sign in as `ada@devhub.dev` / `password123`. The API docs are at http://localhost:8080/docs.
+Open http://localhost:8080 and sign in as `ada@devhub.dev` / `password123`. The API docs are at http://localhost:8080/docs, and every email the app sends (verification, password reset, notifications) lands in Mailpit at http://localhost:8025.
 
 ### Option B: local development with hot reload
 
@@ -137,13 +153,13 @@ Prerequisites: Node.js 20.19+ and Docker (for Postgres and Redis), or your own P
 
 ```bash
 npm install
-npm run db:up                          # postgres + redis via docker compose
+npm run db:up                          # postgres (pgvector) + redis + mailpit via docker compose
 cp apps/api/.env.example apps/api/.env # set JWT_ACCESS_SECRET
 npm run db:migrate && npm run db:seed
 npm run dev                            # API on :4000, web on :5173 (proxied)
 ```
 
-Without a `GEMINI_API_KEY`, the AI features use a deterministic demo provider, and the UI labels them as demo responses.
+Without a `GEMINI_API_KEY`, the AI features use a deterministic demo provider (labelled in the UI) and semantic search uses an offline hashing embedder. "Continue with GitHub/Google" buttons appear once the client ids are set (see `.env.example`).
 
 | Script | What it does |
 |---|---|
@@ -155,14 +171,14 @@ Without a `GEMINI_API_KEY`, the AI features use a deterministic demo provider, a
 
 ## Testing
 
-There are **102 automated tests**:
+There are **154 automated tests**:
 
 | Suite | Count | Covers |
 |---|---|---|
-| API integration and unit (`apps/api/test`) | 66 | Every endpoint against a real Postgres: auth and token rotation with reuse detection, voting idempotency and concurrency, the reputation ledger, accept/un-accept, privacy rules, session capacity races, chat pagination, SSE streaming, schema-validated AI output, PDF magic bytes, sockets (authentication, CRDT sync, identity spoofing), merge-on-save persistence, WebRTC signalling isolation, Gemini fallback and circuit breaker, OpenAPI, metrics |
+| API integration and unit (`apps/api/test`) | 110 | Every endpoint against a real Postgres: auth and token rotation with reuse detection, voting idempotency and concurrency, the reputation ledger, accept/un-accept, privacy rules, session capacity races, chat pagination, SSE streaming, schema-validated AI output, PDF magic bytes, sockets (authentication, CRDT sync, identity spoofing), merge-on-save persistence, WebRTC signalling isolation, Gemini fallback and circuit breaker. **Outbox:** rollback writes no job, crash replay delivers once, concurrent relays, poison-row backoff, retries. **Email verification, password reset** (single use, concurrent resets, no enumeration, all devices signed out). **OAuth:** PKCE, state mismatch, open redirect, account linking. **Semantic search:** indexing, unchanged-content skip, reconcile after a model change, concurrent indexing, duplicates, hybrid RRF, RAG citations and graceful degradation. BullMQ against real Redis. |
 | Shared (`packages/shared`) | 8 | Reputation maths and schema normalisation |
 | Web unit and component (`apps/web/src`) | 15 | Single-flight token refresh, open-redirect guard, optimistic votes with rollback, markdown XSS sanitisation |
-| End-to-end (`apps/web/e2e`) | 13 | Sign-up, sign-in and session restore. The two-user ask, answer, vote and accept loop with a live notification. **Two browsers co-editing one session.** **A whiteboard stroke syncing (and undo).** **A two-way video call with live remote video and mute state.** Profile-only resume tools. axe accessibility checks on five pages |
+| End-to-end (`apps/web/e2e`) | 21 | Sign-up, sign-in and session restore. The two-user Q&A loop with a live notification. **Two browsers co-editing one session.** **Whiteboard sync and undo.** **A two-way video call.** **Email verification and password reset through a real SMTP inbox (Mailpit).** **Duplicate warning while asking, hybrid search and mentor citations.** axe accessibility checks on eight pages |
 
 The E2E suite also passes against the production Docker stack (nginx, two API replicas, Redis, Postgres).
 
@@ -171,13 +187,14 @@ The E2E suite also passes against the production Docker stack (nginx, two API re
 ```
 apps/
   api/                 Express 5 + Socket.IO API
-    prisma/            schema + migrations (FTS triggers, CHECK constraints)
+    prisma/            schema + migrations (FTS triggers, CHECK constraints, pgvector HNSW)
     src/
       config/          zod-validated environment
       core/            errors, validation, policies, event bus, route helper
       lib/             prisma, logger, cache, metrics
       middleware/      auth, request ids, logging, rate limits, error handler
-      modules/         auth · questions · snippets · sessions · users · notifications · ai
+      modules/         auth (+ OAuth, email tokens) · questions · snippets · sessions · users · notifications · ai · search (pgvector)
+      jobs/            BullMQ / in-process queue, transactional outbox, mailer, email templates, handlers
       realtime/        Socket.IO gateway + Yjs DocManager
       container.ts     composition root (dependency injection)
     test/              integration + unit tests
@@ -208,7 +225,9 @@ docs/                  architecture, system design, ADRs, audit, screenshots
 |---|---|
 | ![Home](docs/screenshots/home.png) | ![Question with accepted answer](docs/screenshots/question.png) |
 | ![Dashboard](docs/screenshots/dashboard.png) | ![Streaming AI mentor](docs/screenshots/mentor.png) |
-| ![Optional cyberpunk theme](docs/screenshots/cyberpunk.png) | ![Generated OpenAPI docs](docs/screenshots/api-docs.png) |
+| ![AI mentor citing a community answer](docs/screenshots/mentor-citations.png) | ![Hybrid search matching by meaning](docs/screenshots/search.png) |
+| ![Duplicate warning while asking](docs/screenshots/duplicate-hint.png) | ![Optional cyberpunk theme](docs/screenshots/cyberpunk.png) |
+| ![Generated OpenAPI docs](docs/screenshots/api-docs.png) | |
 
 <p align="center"><img src="docs/screenshots/mobile.png" width="300" alt="Mobile layout" /></p>
 
