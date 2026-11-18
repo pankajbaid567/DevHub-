@@ -1,4 +1,5 @@
 import type { Server as HttpServer } from 'node:http';
+import { Gauge } from '../lib/metrics.js';
 import { SessionRecorder } from './recorder.js';
 import type { RunBroadcaster } from '../modules/runs/runs.service.js';
 import { Server, type Socket } from 'socket.io';
@@ -80,6 +81,20 @@ export function attachRealtime(httpServer: HttpServer, c: Container) {
   const docs = new DocManager(c.sessions, c.logger);
   const recorder = new SessionRecorder(c.db, c.logger);
   docs.observe(recorder);
+  c.metrics.add(
+    new Gauge(
+      'realtime_connections',
+      'Open Socket.IO connections on this replica',
+      () => io.engine.clientsCount,
+    ),
+  );
+  c.metrics.add(
+    new Gauge(
+      'collab_documents_loaded',
+      'Session documents held in memory on this replica',
+      () => docs.size,
+    ),
+  );
   const statusCache = new Map<string, SessionStatus>();
 
   // Updates applied on another instance are merged into this instance's copy (CRDT: order-free).

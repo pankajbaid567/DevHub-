@@ -1,6 +1,6 @@
 # Performance and load testing
 
-Measured with [k6](https://k6.io) against the production Docker stack: nginx in front of **two API replicas**, Postgres 16 (pgvector), Redis and the worker queue. Scripts are in [`loadtest/`](../loadtest).
+Measured with [k6](https://k6.io) against the production Docker stack: nginx in front of two API replicas (see the note below: one load-generator IP means one replica served the HTTP load), Postgres 16 (pgvector), Redis and the worker queue. Scripts are in [`loadtest/`](../loadtest).
 
 **Environment:** a single MacBook (Apple M3) running Docker Desktop, with k6 running in a container on the *same* machine (so the load generator competes with the system under test for CPU). Treat the numbers as a conservative floor for one laptop, not a cloud benchmark.
 
@@ -11,6 +11,8 @@ docker run --rm --network devhub_default -v "$PWD/loadtest:/scripts" grafana/k6:
 ```
 
 The overlay only adds a `RATE_LIMIT_ALLOWLIST` for the Docker network, so the single-IP load generator isn't throttled. Limits stay on for everyone else.
+
+> **These are single-replica numbers.** nginx balances with `ip_hash` (Socket.IO's HTTP long-polling fallback needs a client to stay on one replica), and k6 sends everything from one IP, so the Grafana "requests per replica" panel shows all of the load on one replica. The figures below are therefore what **one** API process sustains. Real users spread across replicas by IP, and for a WebSocket-only client, `least_conn` balancing would remove the pinning entirely.
 
 ## Mixed workload (`api.js`, 90 s)
 
@@ -43,7 +45,7 @@ Reads (list and detail) at a ramping arrival rate until something breaks:
 | 1,500 → 2,000 req/s | 1,735 req/s | 1.5 ms | 61.8 ms | 171 ms | 0 |
 | 2,000 → 2,500 req/s | 2,222 req/s | 7.3 ms | 184 ms | 1,002 ms | 0 |
 
-**The knee is about 2,000 req/s on one laptop with two replicas**, with no errors at any stage. Past it, latency degrades gradually rather than failing. The next levers are more replicas (stateless, verified with `--scale api=3`), a read replica for list queries and caching hot question pages.
+**The knee is about 2,000 req/s for a single API replica on one laptop**, with no errors at any stage. Past it, latency degrades gradually rather than failing. The next levers are more replicas (stateless, verified with `--scale api=3`), a read replica for list queries and caching hot question pages.
 
 ## Bugs the load test found (all fixed, with regression tests)
 

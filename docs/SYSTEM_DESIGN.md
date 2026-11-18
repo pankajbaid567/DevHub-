@@ -192,6 +192,8 @@ Caches are behind the `Cache` interface: Redis in production, an in-memory bound
   - `socket_events_total` and `ai_requests_total` (by outcome);
   - process memory and uptime.
 - **Probes:** `/health` (liveness) and `/ready` (Postgres and Redis).
+- **Realtime:** `realtime_connections` and `collab_documents_loaded` gauges, per replica.
+- **Stack:** `docker compose --profile observability up -d` runs Prometheus (DNS service discovery of all `api` replicas, alert rules in `observability/alerts.yml`) and Grafana with a provisioned dashboard (`observability/grafana/dashboards/devhub-overview.json`).
 - **Jobs:** `jobs_total{name,outcome}` and `job_duration_seconds{name}`. The outbox's `attempts` and `lastError` columns show anything stuck.
 
 ## Search

@@ -54,7 +54,7 @@ Try it locally with the seeded demo account **`ada@devhub.dev` / `password123`**
 These are the parts I'd point a reviewer to.
 
 - **Verified horizontal scaling.** `docker compose up --scale api=3` runs several stateless API replicas behind nginx. Socket.IO rooms span instances through the Redis adapter, CRDT updates are relayed between instances, and cache and rate limits live in Redis. A test client in the Docker network puts two users on different replicas and confirms they co-edit, chat and see each other ([details](docs/SYSTEM_DESIGN.md#horizontal-scaling)).
-- **Load-tested, with the bugs it found fixed.** With k6 against two replicas behind nginx on one laptop: 44.5k requests at 0 % errors with **p95 7 ms (browse), 14 ms (hybrid search) and 29 ms (40 users voting on the same 3 rows)**, the reputation ledger still exact afterwards, and a capacity knee at **about 2,000 req/s** with no errors. The load test exposed a same-user vote race, keep-alive 502s behind nginx and pool starvation on 2-vCPU machines; each is fixed with a regression test ([report](docs/PERFORMANCE.md)).
+- **Load-tested, with the bugs it found fixed.** With k6 against the production stack on one laptop (a single API replica served the load, because nginx pins one client IP to one replica): 44.5k requests at 0 % errors with **p95 7 ms (browse), 14 ms (hybrid search) and 29 ms (40 users voting on the same 3 rows)**, the reputation ledger still exact afterwards, and a capacity knee at **about 2,000 req/s per replica** with no errors. The load test exposed a same-user vote race, keep-alive 502s behind nginx and pool starvation on 2-vCPU machines; each is fixed with a regression test ([report](docs/PERFORMANCE.md)).
 - **Correctness under concurrency, proven by tests.**
   - Votes are idempotent: concurrent duplicate votes become one vote, through a unique constraint plus a bounded retry.
   - The capacity race for the last seat in a session is closed with `SELECT … FOR UPDATE`.
@@ -94,6 +94,7 @@ These are the parts I'd point a reviewer to.
   - Authorisation rules live together in one policy module.
   - Each route is declared once, which produces the Express handler, the validation and the OpenAPI docs together, so they cannot drift.
 - **One contract for both sides.** `packages/shared` holds the zod schemas, DTO types and a **typed Socket.IO event map**, so a mismatched payload is a compile error in both the API and the web app.
+- **Observability.** `docker compose --profile observability up` adds Prometheus (with DNS discovery of every replica, plus SLO-style alert rules for replica down, error rate, p95, failing jobs and AI degradation) and a provisioned Grafana dashboard: traffic by route, latency percentiles, status codes, per-replica load, socket connections, collaborative documents in memory, job outcomes and durations, AI calls and memory.
 - **Production operations.** Structured JSON logs with request IDs, Prometheus metrics, liveness and readiness probes, graceful shutdown that flushes collaborative documents, multi-stage non-root Docker images, and CI with E2E tests against a real stack.
 
 ## Architecture
@@ -239,7 +240,7 @@ docs/                  architecture, system design, ADRs, audit, screenshots
 | ![Dashboard](docs/screenshots/dashboard.png) | ![Streaming AI mentor](docs/screenshots/mentor.png) |
 | ![AI mentor citing a community answer](docs/screenshots/mentor-citations.png) | ![Hybrid search matching by meaning](docs/screenshots/search.png) |
 | ![Duplicate warning while asking](docs/screenshots/duplicate-hint.png) | ![Optional cyberpunk theme](docs/screenshots/cyberpunk.png) |
-| ![Generated OpenAPI docs](docs/screenshots/api-docs.png) | |
+| ![Generated OpenAPI docs](docs/screenshots/api-docs.png) | ![Grafana dashboard during a load test](docs/screenshots/grafana.png) |
 
 <p align="center"><img src="docs/screenshots/mobile.png" width="300" alt="Mobile layout" /></p>
 
