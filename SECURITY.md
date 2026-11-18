@@ -31,6 +31,16 @@ Please use GitHub's **private vulnerability reporting** (Security tab → *Repor
 | Secrets misconfiguration | The environment is validated at boot: the secret must be at least 32 characters, placeholders are refused in production, and disabling rate limits is refused in production. Logs redact authorisation headers, cookies and passwords. | `config/env.ts`, `lib/logger.ts` |
 | Information leakage | Generic 500 bodies; stable error codes; `x-powered-by` removed; helmet headers; containers run as non-root | `middleware/http.ts`, Dockerfiles |
 
+## Dependency audit (accepted findings)
+
+`npm audit --omit=dev` reports one transitive advisory, recorded here instead of silently ignored:
+
+| Advisory | Where | Why it is not exploitable here | Exit plan |
+|---|---|---|---|
+| `deepmerge-ts` < 8: stack exhaustion on recursive object graphs (GHSA-ggr8-5vv4-36mx) | `prisma` CLI → `@prisma/config` (pinned exact version) | Only merges our own `prisma.config.ts` when the CLI runs migrations; no request or user data ever reaches it, and the API server does not load it | Upgrade with Prisma 7 (a breaking upgrade, tracked separately); an npm override is blocked by the exact pin |
+
+Development-only advisories (in the Vitest toolchain) don't ship in any image, because the runtime images install production dependencies only.
+
 ## Operational notes
 
 - Set `COOKIE_SECURE=true` and serve over HTTPS in production.
