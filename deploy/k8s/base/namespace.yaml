@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: devhub
+  labels:
+    # Enforce the "restricted" Pod Security Standard for every workload in the namespace.
+    pod-security.kubernetes.io/enforce: restricted

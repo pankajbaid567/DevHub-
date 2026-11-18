@@ -1,0 +1,32 @@
+# ingress-nginx. Socket.IO's HTTP long-polling fallback needs every request of a client to hit
+# the same pod, hence cookie affinity on the API paths; WebSockets are long-lived connections.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: devhub
+  annotations:
+    nginx.ingress.kubernetes.io/affinity: cookie
+    nginx.ingress.kubernetes.io/session-cookie-name: dh_route
+    nginx.ingress.kubernetes.io/session-cookie-samesite: Strict
+    nginx.ingress.kubernetes.io/proxy-read-timeout: '3600'
+    nginx.ingress.kubernetes.io/proxy-send-timeout: '3600'
+    nginx.ingress.kubernetes.io/proxy-body-size: 4m
+    # cert-manager.io/cluster-issuer: letsencrypt
+spec:
+  ingressClassName: nginx
+  # tls: [{ hosts: [devhub.example.com], secretName: devhub-tls }]
+  rules:
+    - host: devhub.example.com
+      http:
+        paths:
+          - {
+              path: /api,
+              pathType: Prefix,
+              backend: { service: { name: api, port: { number: 4000 } } },
+            }
+          - {
+              path: /socket.io,
+              pathType: Prefix,
+              backend: { service: { name: api, port: { number: 4000 } } },
+            }
+          - { path: /, pathType: Prefix, backend: { service: { name: web, port: { number: 80 } } } }

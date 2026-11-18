@@ -96,6 +96,12 @@ These are the parts I'd point a reviewer to.
   - Each route is declared once, which produces the Express handler, the validation and the OpenAPI docs together, so they cannot drift.
 - **One contract for both sides.** `packages/shared` holds the zod schemas, DTO types and a **typed Socket.IO event map**, so a mismatched payload is a compile error in both the API and the web app.
 - **Observability.** `docker compose --profile observability up` adds Prometheus (with DNS discovery of every replica, plus SLO-style alert rules for replica down, error rate, p95, failing jobs and AI degradation) and a provisioned Grafana dashboard: traffic by route, latency percentiles, status codes, per-replica load, socket connections, collaborative documents in memory, job outcomes and durations, AI calls and memory.
+- **Kubernetes-ready, and verified on a real cluster.** Kustomize manifests (`deploy/k8s`):
+  - the namespace enforces the *restricted* Pod Security Standard, with non-root, read-only containers and all capabilities dropped (the web image is now unprivileged nginx);
+  - migrations run in init containers, rollouts have zero downtime with startup, readiness and liveness probes, and there's an HPA, PodDisruptionBudgets and topology spread;
+  - an Ingress with cookie affinity serves Socket.IO;
+  - NetworkPolicies give the code runner **no egress at all**.
+  - `./deploy/k8s/kind-up.sh` brings it all up locally, and it was verified end to end, including code execution and WebSockets ([deployment guide](docs/DEPLOYMENT.md)).
 - **Production operations.** Structured JSON logs with request IDs, Prometheus metrics, liveness and readiness probes, graceful shutdown that flushes collaborative documents, multi-stage non-root Docker images, and CI with E2E tests against a real stack.
 
 ## Architecture
@@ -144,7 +150,7 @@ There's much more in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md): the data mode
 | **Web** | React 19, TypeScript (strict), Vite, Tailwind CSS 4, TanStack Query, React Router 7, react-hook-form + zod, Monaco, Yjs (`y-monaco`), Socket.IO client, react-markdown + rehype-sanitize |
 | **API** | Node.js 20, Express 5, TypeScript (strict), Prisma 6, PostgreSQL 16 + pgvector, Socket.IO 4 + Redis adapter, ioredis, BullMQ, Nodemailer, Yjs, zod, Pino, `@google/genai` (chat + embeddings), zod-to-openapi + Swagger UI |
 | **Quality** | k6 (load and stress), Vitest, Supertest, Socket.IO client tests, React Testing Library, Playwright, axe-core, ESLint (typescript-eslint, React hooks), Prettier |
-| **Infrastructure** | Docker (multi-stage), Docker Compose, nginx, Mailpit, GitHub Actions |
+| **Infrastructure** | Docker (multi-stage, non-root), Docker Compose, Kubernetes (Kustomize, kind), nginx, Prometheus, Grafana, Mailpit, GitHub Actions |
 
 ## Quick start
 
@@ -220,13 +226,17 @@ apps/
     e2e/               Playwright specs
 packages/
   shared/              zod schemas, DTO types, typed socket events, reputation rules
-docs/                  architecture, system design, ADRs, audit, screenshots
+deploy/k8s/             Kustomize base + kind overlay, kind-up.sh
+observability/         Prometheus config, alert rules, Grafana dashboard
+loadtest/              k6 load and stress tests
+docs/                  architecture, system design, deployment, performance, ADRs, screenshots
 ```
 
 ## Documentation
 
 - [Architecture](docs/ARCHITECTURE.md): layers, patterns, data model and sequence diagrams
 - [System design](docs/SYSTEM_DESIGN.md): scaling, caching, consistency, failure modes and capacity
+- [Deployment](docs/DEPLOYMENT.md): Docker Compose and Kubernetes, with a production checklist
 - [Performance](docs/PERFORMANCE.md): k6 load and stress results, and the bugs they found
 - [Architecture decision records](docs/adr/)
 - [API](docs/API.md) and [real-time protocol](docs/REALTIME.md). The live OpenAPI docs are served at `/docs`.

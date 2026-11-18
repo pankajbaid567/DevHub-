@@ -1,0 +1,18 @@
+# Non-secret configuration. Secrets (DATABASE_URL, JWT_ACCESS_SECRET, RUNNER_TOKEN, API keys)
+# come from the `devhub-secrets` Secret, created per environment (see overlays/kind or use
+# External Secrets / Sealed Secrets in production).
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: devhub-config
+data:
+  NODE_ENV: production
+  LOG_LEVEL: info
+  TRUST_PROXY: '2'
+  COOKIE_SECURE: 'true'
+  PUBLIC_URL: https://devhub.example.com
+  CORS_ORIGINS: https://devhub.example.com
+  CODE_RUNNER_URL: http://runner:2000
+  DB_POOL_SIZE: '10'
+  RUN_MIGRATIONS: 'false'
+  SEED_DEMO_DATA: 'false'

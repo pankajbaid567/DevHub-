@@ -90,7 +90,7 @@ services:
 
   web:
     build: { context: ., dockerfile: apps/web/Dockerfile }
-    ports: ['8080:80']
+    ports: ['8080:8080']
     depends_on:
       api: { condition: service_healthy }
     restart: unless-stopped

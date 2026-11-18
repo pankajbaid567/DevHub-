@@ -10,7 +10,7 @@ import http from 'k6/http';
 import { check, sleep } from 'k6';
 import { Trend } from 'k6/metrics';
 
-const BASE = __ENV.BASE_URL || 'http://web';
+const BASE = __ENV.BASE_URL || 'http://web:8080';
 const API = `${BASE}/api/v1`;
 const VOTERS = Number(__ENV.VOTERS || 40);
 

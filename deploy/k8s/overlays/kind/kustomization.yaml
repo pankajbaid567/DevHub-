@@ -1,0 +1,50 @@
+# Local cluster: everything in-cluster, images loaded with `kind load docker-image`.
+# Production would point DATABASE_URL / REDIS_URL at managed services (RDS/Cloud SQL with
+# pgvector, ElastiCache/Memorystore) and pull images from a registry by digest.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: devhub
+resources:
+  - ../../base
+  - postgres.yaml
+  - redis.yaml
+images:
+  - { name: devhub-api, newName: devhub-api, newTag: kind }
+  - { name: devhub-web, newName: devhub-web, newTag: kind }
+  - { name: devhub-runner, newName: devhub-runner, newTag: kind }
+secretGenerator:
+  - name: devhub-secrets
+    literals:
+      - DATABASE_URL=postgresql://devhub:devhub@postgres:5432/devhub?schema=public
+      - REDIS_URL=redis://redis:6379
+      - JWT_ACCESS_SECRET=kind-only-secret-0123456789abcdefghijklmnopqrstuvwxyz
+      - RUNNER_TOKEN=kind-only-runner-token-0123456789
+patches:
+  - target: { kind: ConfigMap, name: devhub-config }
+    patch: |-
+      - op: replace
+        path: /data/PUBLIC_URL
+        value: http://localhost:8080
+      - op: replace
+        path: /data/CORS_ORIGINS
+        value: http://localhost:8080
+      - op: replace
+        path: /data/COOKIE_SECURE
+        value: 'false'
+      - op: replace
+        path: /data/SEED_DEMO_DATA
+        value: 'true'
+      - op: replace
+        path: /data/TRUST_PROXY
+        value: '1'
+  # Our images are side-loaded, never pulled (third-party images are pulled normally).
+  - target: { kind: Deployment, labelSelector: 'app.kubernetes.io/name in (api,web,runner)' }
+    patch: |-
+      - op: add
+        path: /spec/template/spec/containers/0/imagePullPolicy
+        value: Never
+  - target: { kind: Deployment, name: api }
+    patch: |-
+      - op: add
+        path: /spec/template/spec/initContainers/0/imagePullPolicy
+        value: Never

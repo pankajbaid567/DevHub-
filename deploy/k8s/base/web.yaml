@@ -1,0 +1,59 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web
+  labels: { app.kubernetes.io/name: web }
+spec:
+  replicas: 2
+  selector:
+    matchLabels: { app.kubernetes.io/name: web }
+  template:
+    metadata:
+      labels: { app.kubernetes.io/name: web }
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 101 # nginx
+        runAsGroup: 101
+        seccompProfile: { type: RuntimeDefault }
+      containers:
+        - name: web
+          image: devhub-web
+          ports: [{ name: http, containerPort: 8080 }]
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: { drop: [ALL] }
+          volumeMounts:
+            - { name: cache, mountPath: /var/cache/nginx }
+            - { name: tmp, mountPath: /tmp } # nginx-unprivileged keeps its pid file here
+          readinessProbe:
+            httpGet: { path: /healthz, port: http }
+            periodSeconds: 5
+          livenessProbe:
+            httpGet: { path: /healthz, port: http }
+            periodSeconds: 10
+          resources:
+            requests: { cpu: 20m, memory: 32Mi }
+            limits: { memory: 128Mi }
+      volumes:
+        - { name: cache, emptyDir: {} }
+        - { name: tmp, emptyDir: {} }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: web
+  labels: { app.kubernetes.io/name: web }
+spec:
+  selector: { app.kubernetes.io/name: web }
+  ports: [{ name: http, port: 80, targetPort: http }]
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: web
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels: { app.kubernetes.io/name: web }

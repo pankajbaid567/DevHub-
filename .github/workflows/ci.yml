@@ -26,6 +26,8 @@ jobs:
       - run: npm run lint
       - run: npm run format:check
       - run: npm run typecheck
+      - name: Kubernetes manifests render
+        run: kubectl kustomize deploy/k8s/overlays/kind > /dev/null && kubectl kustomize deploy/k8s/base > /dev/null
 
   test-api:
     name: API tests (Postgres)

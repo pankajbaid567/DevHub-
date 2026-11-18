@@ -1,0 +1,55 @@
+# Sandboxed code runner: the most locked-down workload. See ADR 0011.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: runner
+  labels: { app.kubernetes.io/name: runner }
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app.kubernetes.io/name: runner }
+  template:
+    metadata:
+      labels: { app.kubernetes.io/name: runner }
+    spec:
+      automountServiceAccountToken: false # user code must never see a Kubernetes API token
+      enableServiceLinks: false
+      shareProcessNamespace: true # the pause container reaps orphaned processes (like tini)
+      # runtimeClassName: gvisor   # recommended for public traffic (needs gVisor on nodes)
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        seccompProfile: { type: RuntimeDefault }
+      containers:
+        - name: runner
+          image: devhub-runner
+          ports: [{ name: http, containerPort: 2000 }]
+          env:
+            - name: RUNNER_TOKEN
+              valueFrom: { secretKeyRef: { name: devhub-secrets, key: RUNNER_TOKEN } }
+            - { name: RUNNER_CONCURRENCY, value: '2' }
+            - { name: RUNNER_MAX_PROCS, value: '96' }
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: { drop: [ALL] }
+          volumeMounts: [{ name: tmp, mountPath: /tmp }]
+          readinessProbe:
+            httpGet: { path: /health, port: http }
+            periodSeconds: 5
+          resources:
+            requests: { cpu: 100m, memory: 128Mi }
+            limits: { cpu: '1', memory: 512Mi }
+      volumes:
+        - name: tmp
+          emptyDir: { medium: Memory, sizeLimit: 64Mi }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: runner
+  labels: { app.kubernetes.io/name: runner }
+spec:
+  selector: { app.kubernetes.io/name: runner }
+  ports: [{ name: http, port: 2000, targetPort: http }]

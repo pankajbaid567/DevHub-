@@ -3,7 +3,7 @@
 import http from 'k6/http';
 import { check } from 'k6';
 
-const API = `${__ENV.BASE_URL || 'http://web'}/api/v1`;
+const API = `${__ENV.BASE_URL || 'http://web:8080'}/api/v1`;
 
 export const options = {
   scenarios: {
