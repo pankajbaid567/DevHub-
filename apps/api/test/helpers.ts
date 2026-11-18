@@ -110,9 +110,21 @@ const TABLES = [
 ];
 
 export async function resetDb(c: Container): Promise<void> {
-  await c.db.$executeRawUnsafe(
-    `TRUNCATE ${TABLES.map((t) => `"${t}"`).join(', ')} RESTART IDENTITY CASCADE`,
-  );
+  // Let the previous test's background work (outbox relay, queued jobs) finish first: a
+  // TRUNCATE takes an exclusive lock and would deadlock with a relay holding row locks.
+  await settle(c).catch(() => undefined);
+  for (let attempt = 1; ; attempt++) {
+    try {
+      await c.db.$executeRawUnsafe(
+        `TRUNCATE ${TABLES.map((t) => `"${t}"`).join(', ')} RESTART IDENTITY CASCADE`,
+      );
+      return;
+    } catch (err) {
+      const deadlock = String((err as Error).message).includes('40P01');
+      if (!deadlock || attempt >= 5) throw err;
+      await new Promise((r) => setTimeout(r, 50 * attempt));
+    }
+  }
 }
 
 let counter = 0;
