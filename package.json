@@ -2,7 +2,7 @@
   "name": "devhub-plus",
   "private": true,
   "version": "1.0.0",
-  "description": "DevHub+ — a real-time developer community platform: Q&A with reputation, code snippets, collaborative coding sessions and an AI mentor.",
+  "description": "DevHub+ \u2014 a real-time developer community platform: Q&A with reputation, code snippets, collaborative coding sessions and an AI mentor.",
   "license": "MIT",
   "author": "Pankaj Baid",
   "engines": {
@@ -35,5 +35,8 @@
     "typescript": "~5.9.3",
     "typescript-eslint": "^8.73.0"
   },
-  "type": "module"
+  "type": "module",
+  "overrides": {
+    "monaco-editor": "0.52.2"
+  }
 }

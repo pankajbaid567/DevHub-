@@ -91,7 +91,7 @@ export function createApp(
   // --------------------------------------------------------------- API v1
   const limiters = rateLimiters(c.redis, {
     aiPerHour: c.env.AI_REQUESTS_PER_HOUR,
-    disabled: Boolean(opts.disableRateLimits),
+    disabled: Boolean(opts.disableRateLimits) || !c.env.RATE_LIMITS_ENABLED,
   });
   const { requireAuth, optionalAuth } = authMiddleware(c.tokens);
   const registry = new OpenAPIRegistry();

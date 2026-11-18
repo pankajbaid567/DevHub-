@@ -167,14 +167,12 @@ export class UsersService {
         title: s.title,
         createdAt: s.createdAt.toISOString(),
       })),
-      ...events
-        .slice(-5)
-        .map((e) => ({
-          type: 'reputation' as const,
-          delta: e.delta,
-          reason: e.reason,
-          createdAt: e.createdAt.toISOString(),
-        })),
+      ...events.slice(-5).map((e) => ({
+        type: 'reputation' as const,
+        delta: e.delta,
+        reason: e.reason,
+        createdAt: e.createdAt.toISOString(),
+      })),
     ]
       .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
       .slice(0, 10);

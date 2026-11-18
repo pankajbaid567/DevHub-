@@ -44,6 +44,11 @@ const envSchema = z
     GEMINI_FALLBACK_MODEL: z.string().default('gemini-2.5-flash-lite'),
     AI_TIMEOUT_MS: z.coerce.number().int().min(1_000).max(120_000).default(45_000),
     AI_REQUESTS_PER_HOUR: z.coerce.number().int().min(1).max(1_000).default(30),
+    /** Disable only for local load/E2E testing; refused in production. */
+    RATE_LIMITS_ENABLED: z
+      .enum(['true', 'false'])
+      .default('true')
+      .transform((v) => v === 'true'),
   })
   .transform((e) => ({
     ...e,
@@ -62,6 +67,9 @@ export function loadEnv(source: NodeJS.ProcessEnv = process.env): Env {
       .map((i) => `  - ${i.path.join('.')}: ${i.message}`)
       .join('\n');
     throw new Error(`Invalid environment configuration:\n${problems}`);
+  }
+  if (parsed.data.isProd && !parsed.data.RATE_LIMITS_ENABLED) {
+    throw new Error('RATE_LIMITS_ENABLED=false is not allowed in production');
   }
   if (parsed.data.isProd && parsed.data.JWT_ACCESS_SECRET.includes('change-me')) {
     throw new Error('JWT_ACCESS_SECRET still has its placeholder value');

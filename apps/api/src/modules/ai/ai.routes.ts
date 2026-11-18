@@ -182,14 +182,12 @@ export function aiRoutes(ctx: RouteContext, c: Container, aiLimiter: RequestHand
         text,
         targetRole: req.body?.targetRole || undefined,
       });
-      res
-        .status(201)
-        .json(
-          await c.ai.reviewResume(user.id, input.text, {
-            ...(fileName && { fileName }),
-            ...(input.targetRole && { targetRole: input.targetRole }),
-          }),
-        );
+      res.status(201).json(
+        await c.ai.reviewResume(user.id, input.text, {
+          ...(fileName && { fileName }),
+          ...(input.targetRole && { targetRole: input.targetRole }),
+        }),
+      );
     },
   });
 

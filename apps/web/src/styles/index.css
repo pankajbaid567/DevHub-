@@ -1,0 +1,220 @@
+@import 'tailwindcss';
+@plugin '@tailwindcss/typography';
+
+/* Dark variant follows the `dark` class set by the theme provider (light/dark/cyberpunk). */
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  --font-sans: 'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  --animate-fade-in: fade-in 160ms ease-out;
+  --animate-slide-up: slide-up 220ms cubic-bezier(0.2, 0.8, 0.2, 1);
+
+  @keyframes fade-in {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+  @keyframes slide-up {
+    from {
+      opacity: 0;
+      transform: translateY(6px);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+}
+
+/*
+ * Semantic design tokens. Components only use these names (bg-surface, text-muted,
+ * border-line, bg-accent...), so a theme is just a different set of values.
+ */
+@theme inline {
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-fg: var(--fg);
+  --color-muted: var(--muted);
+  --color-line: var(--line);
+  --color-accent: var(--accent);
+  --color-accent-fg: var(--accent-fg);
+  --color-accent-soft: var(--accent-soft);
+  --color-accent-2: var(--accent-2);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-danger: var(--danger);
+  --shadow-card: var(--card-shadow);
+  --shadow-glow: var(--glow);
+}
+
+:root,
+[data-theme='light'] {
+  --bg: #f8fafc;
+  --surface: #ffffff;
+  --surface-2: #f1f5f9;
+  --fg: #0f172a;
+  --muted: #536173;
+  --line: #e2e8f0;
+  --accent: #4f46e5;
+  --accent-fg: #ffffff;
+  --accent-soft: #eef2ff;
+  --accent-2: #0891b2;
+  --success: #047857;
+  --warning: #b45309;
+  --danger: #dc2626;
+  --card-shadow: 0 1px 2px rgb(15 23 42 / 0.04), 0 1px 3px rgb(15 23 42 / 0.06);
+  --glow: 0 0 0 rgb(0 0 0 / 0);
+  color-scheme: light;
+}
+
+[data-theme='dark'] {
+  --bg: #0b1120;
+  --surface: #111827;
+  --surface-2: #1e293b;
+  --fg: #e2e8f0;
+  --muted: #94a3b8;
+  --line: #1f2a3c;
+  --accent: #818cf8;
+  --accent-fg: #0b1120;
+  --accent-soft: rgb(129 140 248 / 0.12);
+  --accent-2: #22d3ee;
+  --success: #34d399;
+  --warning: #fbbf24;
+  --danger: #f87171;
+  --card-shadow: 0 1px 2px rgb(0 0 0 / 0.3);
+  --glow: 0 0 0 rgb(0 0 0 / 0);
+  color-scheme: dark;
+}
+
+/* Optional theme, kept from the original DevHub+ concept: neon on deep purple. */
+[data-theme='cyberpunk'] {
+  --bg: #0d0221;
+  --surface: #160935;
+  --surface-2: #22114a;
+  --fg: #f0e6ff;
+  --muted: #a99bd6;
+  --line: #3a1f70;
+  --accent: #ff2a6d;
+  --accent-fg: #0d0221;
+  --accent-soft: rgb(255 42 109 / 0.14);
+  --accent-2: #05d9e8;
+  --success: #39ff14;
+  --warning: #f9f002;
+  --danger: #ff3864;
+  --card-shadow: 0 0 0 1px rgb(5 217 232 / 0.08), 0 8px 24px rgb(0 0 0 / 0.35);
+  --glow: 0 0 18px rgb(255 42 109 / 0.45);
+  color-scheme: dark;
+}
+
+[data-theme='cyberpunk'] body {
+  background-image:
+    linear-gradient(rgb(5 217 232 / 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgb(5 217 232 / 0.05) 1px, transparent 1px);
+  background-size: 32px 32px;
+}
+
+[data-theme='cyberpunk'] h1,
+[data-theme='cyberpunk'] h2 {
+  font-family: var(--font-mono);
+  letter-spacing: -0.01em;
+  text-shadow: 0 0 12px rgb(5 217 232 / 0.35);
+}
+
+@layer base {
+  html {
+    -webkit-font-smoothing: antialiased;
+  }
+  body {
+    @apply bg-bg font-sans text-fg;
+    text-rendering: optimizeLegibility;
+  }
+  :focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+  ::selection {
+    background: var(--accent-soft);
+  }
+}
+
+@layer components {
+  /* Markdown content (questions, answers, AI replies). */
+  .prose-devhub {
+    @apply prose prose-slate max-w-none dark:prose-invert;
+    --tw-prose-links: var(--accent);
+    --tw-prose-invert-links: var(--accent);
+  }
+  .prose-devhub pre {
+    @apply rounded-lg border border-line bg-surface-2 text-[13px] leading-relaxed;
+    color: var(--fg);
+  }
+  .prose-devhub :not(pre) > code {
+    @apply rounded bg-surface-2 px-1.5 py-0.5 font-mono text-[0.85em] before:content-none after:content-none;
+  }
+}
+
+/* highlight.js tokens: One Dark on dark themes, GitHub Light on light (all WCAG AA on their background). */
+.hljs-keyword,
+.hljs-selector-tag,
+.hljs-built_in {
+  color: #c678dd;
+}
+.hljs-string,
+.hljs-attr {
+  color: #98c379;
+}
+.hljs-number,
+.hljs-literal {
+  color: #d19a66;
+}
+.hljs-comment {
+  color: #8b93a1;
+  font-style: italic;
+}
+.hljs-title,
+.hljs-function {
+  color: #61afef;
+}
+.hljs-type,
+.hljs-class {
+  color: #e5c07b;
+}
+[data-theme='light'] .hljs-keyword,
+[data-theme='light'] .hljs-selector-tag,
+[data-theme='light'] .hljs-built_in {
+  color: #cf222e;
+}
+[data-theme='light'] .hljs-string,
+[data-theme='light'] .hljs-attr {
+  color: #0a3069;
+}
+[data-theme='light'] .hljs-number,
+[data-theme='light'] .hljs-literal {
+  color: #0550ae;
+}
+[data-theme='light'] .hljs-comment {
+  color: #57606a;
+}
+[data-theme='light'] .hljs-title,
+[data-theme='light'] .hljs-function {
+  color: #8250df;
+}
+[data-theme='light'] .hljs-type,
+[data-theme='light'] .hljs-class {
+  color: #953800;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
