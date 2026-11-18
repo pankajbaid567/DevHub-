@@ -369,3 +369,78 @@ describe('code execution', () => {
       .expect(409);
   });
 });
+
+describe('session replay', () => {
+  const replayAll = async (u: TestUser, sessionId: string) => {
+    const res = await request(app)
+      .get(`/api/v1/sessions/${sessionId}/replay`)
+      .set(auth(u))
+      .expect(200);
+    return res.body.items as { id: string; t: string; userId: string | null; update: string }[];
+  };
+
+  it('records each effective edit with its author and rebuilds the document from the log', async () => {
+    const host = await registerUser(app);
+    const guest = await registerUser(app);
+    const sessionId = await liveSession(host, guest);
+    const [a, b] = await Promise.all([client(host.token), client(guest.token)]);
+    await a.emitWithAck('session:join', { sessionId });
+    await b.emitWithAck('session:join', { sessionId });
+
+    const docA = new Y.Doc();
+    const docB = new Y.Doc();
+    docA.on('update', (update: Uint8Array) => a.emit('doc:update', { sessionId, update }));
+    docB.on('update', (update: Uint8Array, origin) => {
+      if (origin !== 'remote') b.emit('doc:update', { sessionId, update });
+    });
+    b.on('doc:update', ({ update }) => Y.applyUpdate(docB, new Uint8Array(update), 'remote'));
+
+    const got = once(b, 'doc:update');
+    docA.getText('code').insert(0, 'function add(a, b) {}');
+    await got;
+    await new Promise((r) => setTimeout(r, 350)); // a new coalescing window
+    docB.getText('code').insert(docB.getText('code').length, '\n// reviewed');
+    await new Promise((r) => setTimeout(r, 150));
+
+    // A reconnecting client re-sends its whole state: nothing new, so nothing is recorded.
+    a.emit('doc:update', { sessionId, update: Y.encodeStateAsUpdate(docA) });
+    await new Promise((r) => setTimeout(r, 150));
+    await rt.recorder.flush();
+
+    const items = await replayAll(host, sessionId);
+    expect(items.map((i) => i.userId)).toEqual([host.id, guest.id]);
+    const rebuilt = new Y.Doc();
+    for (const i of items) Y.applyUpdate(rebuilt, Buffer.from(i.update, 'base64'));
+    expect(rebuilt.getText('code').toString()).toBe('function add(a, b) {}\n// reviewed');
+
+    // Replaying only the first edit shows the document as it was then.
+    const partial = new Y.Doc();
+    Y.applyUpdate(partial, Buffer.from(items[0]!.update, 'base64'));
+    expect(partial.getText('code').toString()).toBe('function add(a, b) {}');
+  });
+
+  it('stores a baseline for documents that existed before recording, once', async () => {
+    const host = await registerUser(app);
+    const guest = await registerUser(app);
+    const sessionId = await liveSession(host, guest);
+    await c.db.session.update({ where: { id: sessionId }, data: { code: 'print("seeded")' } });
+    const a = await client(host.token);
+    await a.emitWithAck('session:join', { sessionId });
+    await new Promise((r) => setTimeout(r, 200));
+    const items = await replayAll(host, sessionId);
+    expect(items).toHaveLength(1);
+    expect(items[0]!.userId).toBeNull();
+    const d = new Y.Doc();
+    Y.applyUpdate(d, Buffer.from(items[0]!.update, 'base64'));
+    expect(d.getText('code').toString()).toBe('print("seeded")');
+  });
+
+  it('is visible to participants only', async () => {
+    const host = await registerUser(app);
+    const guest = await registerUser(app);
+    const outsider = await registerUser(app);
+    const sessionId = await liveSession(host, guest);
+    await request(app).get(`/api/v1/sessions/${sessionId}/replay`).set(auth(outsider)).expect(403);
+    await request(app).get(`/api/v1/sessions/${sessionId}/replay`).expect(401);
+  });
+});

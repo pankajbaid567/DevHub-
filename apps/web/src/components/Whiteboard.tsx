@@ -15,13 +15,13 @@ import { Button } from './ui/Button';
 import { Dialog } from './ui/primitives';
 
 /** Logical board size: every participant sees the same picture whatever their screen size. */
-const W = 1600;
-const H = 1000;
 const MAX_STROKES = 3_000;
 const ERASER_RADIUS = 14;
 const LOCAL = 'board-local';
 const COLORS = ['#0f172a', '#dc2626', '#2563eb', '#16a34a', '#d97706', '#9333ea'];
 const WIDTHS = [3, 6, 12];
+
+import { BOARD_H as H, BOARD_W as W, drawStroke } from '../lib/board';
 
 type Tool = 'pen' | 'highlighter' | 'eraser';
 type Stroke = Y.Map<unknown>;
@@ -39,27 +39,6 @@ interface RemoteCursor {
   color: string;
   x: number;
   y: number;
-}
-
-function drawStroke(ctx: CanvasRenderingContext2D, s: Stroke, scale: number) {
-  const pts = (s.get('points') as Y.Array<number>).toArray();
-  if (pts.length < 2) return;
-  const tool = s.get('tool') as Tool;
-  ctx.globalAlpha = tool === 'highlighter' ? 0.35 : 1;
-  ctx.strokeStyle = s.get('color') as string;
-  ctx.lineWidth = (s.get('width') as number) * (tool === 'highlighter' ? 3 : 1) * scale;
-  ctx.beginPath();
-  ctx.moveTo(pts[0]! * scale, pts[1]! * scale);
-  if (pts.length === 2) ctx.lineTo(pts[0]! * scale + 0.01, pts[1]! * scale);
-  // Quadratic smoothing through segment midpoints.
-  for (let i = 2; i < pts.length - 2; i += 2) {
-    const mx = ((pts[i]! + pts[i + 2]!) / 2) * scale;
-    const my = ((pts[i + 1]! + pts[i + 3]!) / 2) * scale;
-    ctx.quadraticCurveTo(pts[i]! * scale, pts[i + 1]! * scale, mx, my);
-  }
-  if (pts.length >= 4) ctx.lineTo(pts[pts.length - 2]! * scale, pts[pts.length - 1]! * scale);
-  ctx.stroke();
-  ctx.globalAlpha = 1;
 }
 
 /**
@@ -134,7 +113,14 @@ export default function Whiteboard({ session, readOnly, canClear, me }: Props) {
 
   // Undo/redo only this user's own strokes and erasures.
   useEffect(() => {
-    const um = new Y.UndoManager(board, { trackedOrigins: new Set([LOCAL]) });
+    // One stroke (or one eraser drag) is exactly one undo step, however long it takes to
+    // draw: no time-based merging; boundaries are set explicitly on pointer down and up.
+    // (With the default 500 ms window, a slowly drawn stroke became several steps and Undo
+    // removed only its last points; this showed up under load in E2E.)
+    const um = new Y.UndoManager(board, {
+      trackedOrigins: new Set([LOCAL]),
+      captureTimeout: Number.MAX_SAFE_INTEGER,
+    });
     undoRef.current = um;
     const sync = () => {
       setCanUndo(um.undoStack.length > 0);
@@ -248,6 +234,7 @@ export default function Whiteboard({ session, readOnly, canClear, me }: Props) {
   const endStroke = () => {
     if (frame.current !== null) cancelAnimationFrame(frame.current);
     flushPoints();
+    undoRef.current?.stopCapturing(); // the final points belong to this stroke's step
     drawing.current = null;
   };
 

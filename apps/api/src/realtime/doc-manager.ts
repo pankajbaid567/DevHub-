@@ -45,15 +45,30 @@ export { DOC_TEXT };
  *   state, which is applied here so every instance converges even if a relay was lost.
  * - The doc is flushed and evicted when the last local editor leaves.
  */
+/** Observes document changes (session replay). */
+export interface DocObserver {
+  /** The document was loaded on this instance; `state` is everything it contains. */
+  loaded(sessionId: string, state: Uint8Array): void;
+  /** A local client changed the document; `diff` is exactly what was newly integrated. */
+  changed(sessionId: string, userId: string, diff: Uint8Array): void;
+}
+
+const CLIENT = Symbol('client-update');
+
 export class DocManager {
   private readonly docs = new Map<string, Entry>();
   private readonly loading = new Map<string, Promise<Entry>>();
+  private observer: DocObserver | null = null;
 
   constructor(
     private readonly store: DocStore,
     private readonly logger: Logger,
     private readonly debounceMs = 2_000,
   ) {}
+
+  observe(observer: DocObserver): void {
+    this.observer = observer;
+  }
 
   /** Returns the document, loading it once even under concurrent joins. */
   async acquire(sessionId: string): Promise<Y.Doc> {
@@ -72,6 +87,13 @@ export class DocManager {
         const saved = await this.store.loadDocument(sessionId);
         if (saved?.state) Y.applyUpdate(doc, saved.state);
         else if (saved?.code) doc.getText(DOC_TEXT).insert(0, saved.code);
+        this.observer?.loaded(sessionId, Y.encodeStateAsUpdate(doc));
+        // Yjs reports the *effective* diff of each applied update: a client re-sending its
+        // full state on reconnect produces no event, so replay only stores real edits.
+        doc.on('update', (diff: Uint8Array, origin: unknown) => {
+          if (typeof origin === 'object' && origin !== null && CLIENT in origin)
+            this.observer?.changed(sessionId, (origin as { [CLIENT]: string })[CLIENT], diff);
+        });
         const entry: Entry = {
           doc,
           bytes: saved?.state?.byteLength ?? 0,
@@ -97,7 +119,7 @@ export class DocManager {
    * Applies a client update. Returns false (and changes nothing) if the update is
    * oversized, malformed, or would grow the document past the size limit.
    */
-  applyUpdate(sessionId: string, update: Uint8Array): boolean {
+  applyUpdate(sessionId: string, update: Uint8Array, userId = 'unknown'): boolean {
     const entry = this.docs.get(sessionId);
     if (!entry || update.byteLength > REALTIME_LIMITS.maxDocUpdateBytes) return false;
     if (entry.bytes + update.byteLength > REALTIME_LIMITS.maxDocBytes) return false;
@@ -113,7 +135,7 @@ export class DocManager {
         probe.destroy();
         if (tooBig) return false;
       }
-      Y.applyUpdate(entry.doc, update);
+      Y.applyUpdate(entry.doc, update, { [CLIENT]: userId });
       entry.bytes += update.byteLength;
     } catch (err) {
       this.logger.warn({ err, sessionId }, 'rejected malformed Yjs update');

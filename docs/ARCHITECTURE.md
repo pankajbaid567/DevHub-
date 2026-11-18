@@ -171,6 +171,15 @@ The whiteboard lives in the same document (`Y.Array('board')`, one `Y.Map` per s
 
 Identity always comes from the handshake JWT. Payloads never carry a trusted user id (the original MVP trusted `userId` from the client).
 
+### 4.3.1 Session replay
+
+`DocManager` tags each client update with its author and listens to the Yjs `update` event, which carries the *effective* diff, meaning what was actually new. `SessionRecorder` turns that into an append-only log (`session_updates`):
+
+- **Nothing duplicated:** a reconnecting client re-sends its full state, which changes nothing, emits no event and records nothing. Each replica records only its own clients' edits; edits relayed from other replicas aren't recorded again.
+- **Compact:** a user's keystrokes within 300 ms are merged with `Y.mergeUpdates`, and rows are written in batches every second, off the hot path. Recording is best-effort and can never block live editing.
+- **Baseline:** a document that existed before recording (for example, seeded) gets one snapshot row when first loaded.
+- **Playback** (`lib/replay.ts`): updates are applied in order, with a snapshot every 200 updates, so seeking anywhere costs at most 199 applications. Gaps longer than 2 s are compressed, so idle time is skipped.
+
 ### 4.4 AI mentor streaming
 
 `POST /ai/conversations/:id/messages` stores the user's message, then streams `start → delta* → done` events over Server-Sent Events:

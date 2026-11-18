@@ -104,3 +104,26 @@ export interface CodeRunDto {
   durationMs: number;
   createdAt: string;
 }
+
+export const replayQuerySchema = z.object({
+  after: z
+    .string()
+    .regex(/^\d{1,19}$/)
+    .default('0'),
+  limit: z.coerce.number().int().min(1).max(5_000).default(2_000),
+});
+
+export interface ReplayUpdateDto {
+  id: string;
+  /** When the edit happened (ISO). */
+  t: string;
+  /** Who made it; null for the baseline snapshot. */
+  userId: string | null;
+  /** Yjs update, base64. */
+  update: string;
+}
+
+export interface ReplayPageDto {
+  items: ReplayUpdateDto[];
+  nextAfter: string | null;
+}

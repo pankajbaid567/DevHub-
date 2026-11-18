@@ -2,6 +2,7 @@ import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } fro
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
+  History,
   ArrowLeft,
   Code2,
   PenTool,
@@ -31,7 +32,7 @@ import { useAuth } from '../../auth/context';
 import { useDocumentTitle } from '../../lib/hooks';
 import { cn, displayName, timeAgo } from '../../lib/utils';
 import { Avatar, Badge, Card, ErrorState, Skeleton } from '../../components/ui/primitives';
-import { Button } from '../../components/ui/Button';
+import { Button, ButtonLink } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Field';
 import { PageSpinner } from '../../components/ui/Spinner';
 import { CallPanel } from '../../components/CallPanel';
@@ -499,6 +500,16 @@ export default function SessionRoom() {
             >
               Start
             </Button>
+          )}
+          {s.myRole && (
+            <ButtonLink
+              to={`/sessions/${id}/replay`}
+              size="sm"
+              variant="ghost"
+              icon={<History className="h-3.5 w-3.5" />}
+            >
+              Replay
+            </ButtonLink>
           )}
           {isHost && live && (
             <Button

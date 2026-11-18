@@ -337,6 +337,7 @@ model Session {
   messages     Message[]
   tags         Tag[]
   runs         CodeRun[]
+  updates      SessionUpdate[]
 
   @@index([visibility, status, createdAt(sort: Desc)])
   @@index([hostId])
@@ -479,4 +480,19 @@ model CodeRun {
 
   @@index([sessionId, createdAt(sort: Desc)])
   @@map("code_runs")
+}
+
+/// Append-only edit log for session replay: each row is the effective Yjs diff of one edit
+/// (or a baseline snapshot when a document is first recorded). Applying rows in id order
+/// reconstructs the code and whiteboard at any moment.
+model SessionUpdate {
+  id        BigInt   @id @default(autoincrement())
+  sessionId String
+  userId    String?
+  update    Bytes
+  createdAt DateTime @default(now())
+  session   Session  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId, id])
+  @@map("session_updates")
 }

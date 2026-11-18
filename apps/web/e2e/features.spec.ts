@@ -152,3 +152,26 @@ test('running code in a session shows the same output to every participant', asy
     await expect(output.getByText('Exited 0')).toBeVisible();
   }
 });
+
+test('a session can be replayed: the code is rebuilt from the recorded edits', async ({ page }) => {
+  await signUp(page);
+  await page.goto('/sessions/new');
+  await page.getByLabel('Title').fill(`Replay ${Date.now()}`);
+  await page.getByRole('button', { name: 'Go live' }).click();
+  await expect(page.locator('.monaco-editor')).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByRole('tab', { name: 'People (1)' })).toBeVisible(); // joined the room
+  await page.waitForTimeout(1_000);
+  await page.locator('.monaco-editor').click();
+  await page.keyboard.type('const first = 1;');
+  await page.waitForTimeout(1_200); // a separate coalescing window
+  await page.keyboard.type(' const second = 2;');
+  await page.waitForTimeout(1_500); // recorder flushes every second
+
+  await page.getByRole('link', { name: 'Replay' }).click();
+  await expect(page.getByText(/\d+ recorded edits/)).toBeVisible();
+  // The start of the timeline shows an early state of the document, not the final one.
+  await expect(page.locator('.view-lines')).toContainText('c');
+  await expect(page.locator('.view-lines')).not.toContainText('second');
+  await page.getByRole('button', { name: 'Play' }).click();
+  await expect(page.locator('.view-lines')).toContainText('const second = 2;', { timeout: 15_000 });
+});

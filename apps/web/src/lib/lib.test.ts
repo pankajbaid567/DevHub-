@@ -105,3 +105,34 @@ describe('api client', () => {
     expect(session.currentUser).toBeNull();
   });
 });
+
+describe('session replay engine', () => {
+  it('compresses idle gaps, finds the update at a time and rebuilds past states quickly', async () => {
+    const Y = await import('yjs');
+    const { buildTimeline, indexAt, ReplayDoc, MAX_GAP_MS } = await import('./replay');
+    const doc = new Y.Doc();
+    const updates: Uint8Array[] = [];
+    doc.on('update', (u: Uint8Array) => updates.push(u));
+    for (let i = 0; i < 450; i++) doc.getText('code').insert(i, String(i % 10));
+    const toB64 = (u: Uint8Array) => btoa(String.fromCharCode(...u));
+    const start = Date.parse('2026-01-01T00:00:00Z');
+    const items = updates.map((u, i) => ({
+      id: String(i + 1),
+      // one keystroke per 100 ms, with a 10-minute coffee break after keystroke 100
+      t: new Date(start + i * 100 + (i > 100 ? 600_000 : 0)).toISOString(),
+      userId: 'u1',
+      update: toB64(u),
+    }));
+    const t = buildTimeline(items);
+    expect(t.duration).toBe(449 * 100 - 100 + MAX_GAP_MS); // the break is capped
+    expect(indexAt(t, -1)).toBe(-1);
+    expect(indexAt(t, 1_000)).toBe(10);
+
+    const replay = new ReplayDoc(t);
+    for (const k of [0, 10, 199, 200, 399, 449]) {
+      const d = replay.at(k);
+      expect(d.getText('code').length).toBe(k + 1);
+      d.destroy();
+    }
+  });
+});

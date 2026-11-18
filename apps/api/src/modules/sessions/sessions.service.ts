@@ -3,6 +3,7 @@ import * as Y from 'yjs';
 import { type Prisma } from '@prisma/client';
 import { createSessionSchema, DOC_TEXT, ErrorCode } from '@devhub/shared';
 import type {
+  ReplayPageDto,
   ChatMessageDto,
   CreateSessionInput,
   CursorPage,
@@ -344,6 +345,35 @@ export class SessionsService {
       select: { docState: true, code: true },
     });
     return s ? { state: s.docState ? new Uint8Array(s.docState) : null, code: s.code } : null;
+  }
+
+  /**
+   * A page of the session's edit log for replay (participants only). Updates are opaque Yjs
+   * binaries (base64); the client applies them in order to rebuild any moment.
+   */
+  async replay(
+    user: AuthUser,
+    sessionId: string,
+    after: string,
+    limit: number,
+  ): Promise<ReplayPageDto> {
+    await this.requireParticipant(user, sessionId);
+    const rows = await this.db.sessionUpdate.findMany({
+      where: { sessionId, id: { gt: BigInt(after) } },
+      orderBy: { id: 'asc' },
+      take: limit + 1,
+      select: { id: true, userId: true, update: true, createdAt: true },
+    });
+    const page = rows.slice(0, limit);
+    return {
+      items: page.map((r) => ({
+        id: r.id.toString(),
+        t: r.createdAt.toISOString(),
+        userId: r.userId,
+        update: Buffer.from(r.update).toString('base64'),
+      })),
+      nextAfter: rows.length > limit ? page[page.length - 1]!.id.toString() : null,
+    };
   }
 
   private async requireManageable(user: AuthUser, id: string) {

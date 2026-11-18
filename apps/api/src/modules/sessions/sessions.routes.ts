@@ -1,4 +1,5 @@
 import {
+  replayQuerySchema,
   runCodeSchema,
   createSessionSchema,
   cursorQuerySchema,
@@ -201,6 +202,22 @@ export function sessionRoutes(
         enabled: c.runs.enabled,
         items: await c.runs.history(currentUser(req), req.params.id as string),
       });
+    },
+  });
+
+  defineRoute(ctx, {
+    method: 'get',
+    path: '/:id/replay',
+    tag: 'Sessions',
+    summary: 'Edit log for session replay (Yjs updates in order, paginated)',
+    auth: 'required',
+    params: idParamSchema,
+    query: replayQuerySchema,
+    handler: async (req, res) => {
+      const q = query<{ after: string; limit: number }>(res);
+      res.json(
+        await c.sessions.replay(currentUser(req), req.params.id as string, q.after, q.limit),
+      );
     },
   });
 }

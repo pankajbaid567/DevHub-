@@ -1,4 +1,5 @@
 import type { Server as HttpServer } from 'node:http';
+import { SessionRecorder } from './recorder.js';
 import type { RunBroadcaster } from '../modules/runs/runs.service.js';
 import { Server, type Socket } from 'socket.io';
 import { createAdapter } from '@socket.io/redis-adapter';
@@ -77,6 +78,8 @@ export function attachRealtime(httpServer: HttpServer, c: Container) {
   }
 
   const docs = new DocManager(c.sessions, c.logger);
+  const recorder = new SessionRecorder(c.db, c.logger);
+  docs.observe(recorder);
   const statusCache = new Map<string, SessionStatus>();
 
   // Updates applied on another instance are merged into this instance's copy (CRDT: order-free).
@@ -224,7 +227,7 @@ export function attachRealtime(httpServer: HttpServer, c: Container) {
       } catch {
         return;
       }
-      if (!docs.applyUpdate(sessionId, bytes)) return;
+      if (!docs.applyUpdate(sessionId, bytes, socket.data.user.id)) return;
       socket.to(room(sessionId)).emit('doc:update', { sessionId, update: bytes });
       // Buffer (not Uint8Array) so msgpack encodes it as binary across the Redis adapter.
       if (clustered) io.serverSideEmit('doc:update', { sessionId, update: Buffer.from(bytes) });
@@ -376,8 +379,10 @@ export function attachRealtime(httpServer: HttpServer, c: Container) {
   return {
     io,
     broadcaster,
+    recorder,
     async close() {
       await docs.flushAll();
+      await recorder.flush();
       await new Promise<void>((resolve) => io.close(() => resolve()));
     },
   };
