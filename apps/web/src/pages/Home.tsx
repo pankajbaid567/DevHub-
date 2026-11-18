@@ -51,7 +51,7 @@ const FEATURES = [
   {
     icon: ShieldCheck,
     title: 'Built like production',
-    body: 'Rotating refresh tokens, rate limits, input validation everywhere, observability and 100+ automated tests.',
+    body: 'Rotating refresh tokens, rate limits, input validation everywhere, observability and 90+ automated tests.',
   },
 ];
 

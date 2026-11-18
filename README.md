@@ -1,215 +1,208 @@
-# DevHub+ 🚀
+<div align="center">
 
-A comprehensive full-stack developer platform built with modern web technologies. DevHub+ provides a complete ecosystem for developers to learn, collaborate, and grow their skills through Q&A, code sharing, real-time sessions, and AI-powered mentoring.
+<img src="apps/web/public/favicon.svg" width="72" alt="DevHub+ logo" />
 
-## Project Structure
+# DevHub+
 
-```
-DevHub+/
-├── frontend/          # React + Vite + Tailwind CSS
-│   ├── src/
-│   │   ├── components/    # Reusable components
-│   │   ├── pages/        # Page components
-│   │   └── ...
-│   └── package.json
-├── backend/           # Node.js + Express + Prisma
-│   ├── prisma/       # Database schema and migrations
-│   ├── server.js     # Main server file
-│   └── package.json
-├── .env.example      # Environment variables template
-└── README.md
-```
+**A real-time developer community: Q&A with reputation, collaborative coding sessions, a snippet library and a streaming AI mentor.**
 
-## Tech Stack
+[![CI](https://github.com/pankajbaid567/DevHub-/actions/workflows/ci.yml/badge.svg)](https://github.com/pankajbaid567/DevHub-/actions/workflows/ci.yml)
+![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178c6)
+![Tests](https://img.shields.io/badge/tests-93%20passing-brightgreen)
+![License](https://img.shields.io/badge/license-MIT-blue)
 
-### Frontend
-- **React** - UI library
-- **Vite** - Build tool and development server
-- **Tailwind CSS** - Utility-first CSS framework
-- **React Router DOM** - Client-side routing
+<img src="docs/screenshots/session.png" alt="Two developers editing the same file in real time, with a remote cursor, presence and chat" width="100%" />
 
-### Backend
-- **Node.js** - Runtime environment
-- **Express** - Web framework
-- **Prisma** - Database ORM
-- **PostgreSQL** - Database
-- **Socket.io** - Real-time communication
-- **JWT** - Authentication
-- **bcrypt** - Password hashing
-- **CORS** - Cross-origin resource sharing
+</div>
 
-## Getting Started
+## Contents
 
-### Prerequisites
-- Node.js (v16 or higher)
-- PostgreSQL database
-- npm or yarn
+- [What it does](#what-it-does)
+- [Engineering highlights](#engineering-highlights)
+- [Architecture](#architecture)
+- [Tech stack](#tech-stack)
+- [Quick start](#quick-start)
+- [Testing](#testing)
+- [Project structure](#project-structure)
+- [Documentation](#documentation)
+- [Screenshots](#screenshots)
 
-### Installation
+## What it does
 
-1. **Clone the repository**
-   ```bash
-   git clone <your-repo-url>
-   cd DevHub+
-   ```
+| Feature | Details |
+|---|---|
+| **Q&A with reputation** | Ask, answer, vote and accept answers. Reputation is computed in the same database transaction as each vote and recorded in an auditable ledger. Postgres full-text search with ranking and `"phrase"`, `-exclude` and `or` syntax. |
+| **Live collaborative coding** | A shared Monaco editor synchronised with **Yjs CRDTs** over Socket.IO, with remote cursors, presence, typing indicators and chat. Private sessions use invite codes. Capacity is enforced under a row lock, and the host can start and end sessions. |
+| **Streaming AI mentor** | Multi-turn conversations streamed token by token over Server-Sent Events, with topic-specific system prompts (debugging, code review, system design and more) and saved history. |
+| **Career tools** | Upload a resume PDF and get a structured, schema-validated review (scores, ATS keywords, top actions). Self-rated skills become a phased roadmap. |
+| **Snippet library** | Share, star and fork code, with public, unlisted or private visibility and full-text search across title, description and code. |
+| **Notifications** | Answers, acceptances, upvotes, stars and session starts are pushed live to every open tab. |
+| **Polished UI** | Light, dark and an optional cyberpunk theme, mobile-first layouts, optimistic updates, skeletons and empty states. WCAG AA contrast is verified with axe. |
 
-2. **Set up environment variables**
-   ```bash
-   cp .env.example .env
-   # Edit .env with your actual database URL and secrets
-   ```
+Try it locally with the seeded demo account **`ada@devhub.dev` / `password123`**.
 
-3. **Install frontend dependencies**
-   ```bash
-   cd frontend
-   npm install
-   ```
+## Engineering highlights
 
-4. **Install backend dependencies**
-   ```bash
-   cd ../backend
-   npm install
-   ```
+These are the parts I'd point a reviewer to.
 
-5. **Set up the database**
-   ```bash
-   # Generate Prisma client
-   npx prisma generate
-   
-   # Run database migrations
-   npx prisma migrate dev --name init
-   ```
+- **Verified horizontal scaling.** `docker compose up --scale api=3` runs several stateless API replicas behind nginx. Socket.IO rooms span instances through the Redis adapter, CRDT updates are relayed between instances, and cache and rate limits live in Redis. A test client in the Docker network puts two users on different replicas and confirms they co-edit, chat and see each other ([details](docs/SYSTEM_DESIGN.md#horizontal-scaling)).
+- **Correctness under concurrency, proven by tests.**
+  - Votes are idempotent: concurrent duplicate votes become one vote, through a unique constraint plus a bounded retry.
+  - The capacity race for the last seat in a session is closed with `SELECT … FOR UPDATE`.
+  - Document saves CRDT-merge under a row lock instead of overwriting each other.
+  - The reputation ledger invariant `users.reputation = SUM(events)` is asserted after each scenario.
+- **Security by design.**
+  - Access tokens live only in memory (15 minutes).
+  - Refresh tokens are httpOnly, `SameSite=Strict` cookies that rotate on every use, with reuse detection that revokes the whole token family.
+  - Every input is validated with shared zod schemas, and private content returns 404 rather than 403.
+  - Markdown is sanitised, PDF uploads are checked by magic bytes, login timing is equalised, and helmet plus a strict CSP are in place.
+  - See [SECURITY.md](SECURITY.md).
+- **Clean architecture.**
+  - A composition root wires every service through constructor injection.
+  - Strategy interfaces separate concerns: `AIProvider` (Gemini or a demo provider) and `Cache` (Redis or memory).
+  - A domain event bus (observer pattern) decouples notifications from the code that triggers them.
+  - Authorisation rules live together in one policy module.
+  - Each route is declared once, which produces the Express handler, the validation and the OpenAPI docs together, so they cannot drift.
+- **One contract for both sides.** `packages/shared` holds the zod schemas, DTO types and a **typed Socket.IO event map**, so a mismatched payload is a compile error in both the API and the web app.
+- **Production operations.** Structured JSON logs with request IDs, Prometheus metrics, liveness and readiness probes, graceful shutdown that flushes collaborative documents, multi-stage non-root Docker images, and CI with E2E tests against a real stack.
 
-### Development
+## Architecture
 
-1. **Start the backend server**
-   ```bash
-   cd backend
-   npm run dev
-   ```
-   Server will run on http://localhost:3000
-
-2. **Start the frontend development server**
-   ```bash
-   cd frontend
-   npm run dev
-   ```
-   Frontend will run on http://localhost:5173
-
-### ✨ Features
-
-#### 🏠 **Landing Experience**
-- **Modern Home Page**: Hero section with community stats and feature showcase
-- **Authentication-Aware Navigation**: Dynamic content based on login status
-- **Dark Mode Support**: System preference detection with manual toggle
-
-#### 🔐 **Authentication System**
-- **Secure Login/Register**: Form validation, password strength indicators
-- **JWT Token Management**: Automatic token refresh and secure storage
-- **Protected Routes**: Authentication guards with redirect handling
-- **Social Login Ready**: GitHub integration placeholder
-
-#### ❓ **Questions & Community**
-- **Q&A Platform**: Community-driven question and answer system
-- **Advanced Search**: Filter by tags, status, and popularity
-- **Reputation System**: Vote tracking and user rankings
-- **Rich Content**: Code snippet support in questions/answers
-
-#### 💻 **Code Sharing**
-- **Snippet Library**: Share and discover code snippets
-- **Multi-Language Support**: Syntax highlighting for 20+ languages  
-- **Copy-to-Clipboard**: One-click code copying
-- **Star System**: Community-curated quality ratings
-
-#### 🎯 **Live Collaboration**
-- **Real-Time Sessions**: Multi-user coding sessions with voice/video
-- **Live Code Editor**: Monaco editor with collaborative features
-- **Session Management**: Host controls, participant limits, scheduling
-- **Integrated Chat**: Live messaging during sessions
-
-#### 🤖 **AI-Powered Mentoring**
-- **Smart Code Review**: AI analysis with improvement suggestions
-- **Personalized Learning**: Custom roadmaps based on skill level
-- **Career Guidance**: Resume review and interview preparation
-- **Context-Aware Help**: Google Gemini AI integration
-
-#### 📊 **Analytics Dashboard**
-- **User Statistics**: Questions asked, reputation earned, streaks
-- **Activity Timeline**: Recent contributions and achievements
-- **Community Metrics**: Leaderboards and ranking system
-- **Quick Actions**: Shortcuts to create content and join sessions
-
-### 🛠️ API Endpoints
-
-#### Authentication
-- `POST /auth/register` - User registration with validation
-- `POST /auth/login` - User login with JWT tokens
-- `GET /auth/me` - Current user profile
-- `POST /auth/logout` - Secure logout
-
-#### AI Features
-- `POST /ai/mentor` - AI mentoring conversations
-- `POST /ai/resumeReview` - Resume analysis and feedback
-- `POST /ai/skillRater` - Skill assessment and roadmaps
-
-#### Content Management
-- `GET /questions` - List questions with filtering
-- `POST /questions` - Create new questions
-- `GET /snippets` - Browse code snippets
-- `POST /snippets` - Share code snippets
-
-### 📱 Pages & Components
-
-#### Core Pages
-- **Home** (`/`) - Modern landing with feature showcase
-- **Login** (`/login`) - Secure authentication with social options
-- **Register** (`/register`) - Comprehensive registration with validation
-- **Dashboard** (`/dashboard`) - Personalized user analytics and quick actions
-- **Questions** (`/questions`) - Community Q&A with advanced search
-- **Snippets** (`/snippets`) - Code sharing library with syntax highlighting
-- **Sessions** (`/sessions`) - Live collaborative coding sessions
-- **AI Mentor** (`/mentor`) - Personalized AI guidance and code review
-
-#### Reusable Components
-- **Card**: Consistent container with hover effects
-- **Navbar**: Responsive navigation with theme toggle
-- **Editor**: Monaco-powered code editor
-- **ChatBox**: Real-time messaging component
-- **ProtectedRoute**: Authentication guard wrapper
-
-### Environment Variables
-
-Create a `.env` file in the root directory based on `.env.example`:
-
-```env
-DATABASE_URL="postgresql://username:password@localhost:5432/devhubplus?schema=public"
-JWT_SECRET="your-super-secret-jwt-key-change-this-in-production"
-GEMINI_API_KEY="your-gemini-api-key-here"
-PORT=3000
+```mermaid
+flowchart LR
+  subgraph Browser
+    SPA["React SPA<br/>TanStack Query · Monaco + Yjs"]
+  end
+  SPA -- "HTTPS /api (REST + SSE)" --> NGINX
+  SPA -- "WebSocket /socket.io" --> NGINX
+  NGINX["nginx<br/>static files · CSP · sticky LB"] --> API1["API replica 1"]
+  NGINX --> API2["API replica N"]
+  subgraph API["Express 5 + Socket.IO (stateless)"]
+    API1
+    API2
+  end
+  API1 & API2 --> PG[("PostgreSQL<br/>data · FTS · CRDT state")]
+  API1 & API2 <--> REDIS[("Redis<br/>pub/sub · cache · rate limits")]
+  API1 & API2 --> GEMINI["Gemini API"]
 ```
 
-### Available Scripts
+Inside the API, every module follows **route → service → Prisma**, with cross-cutting concerns as middleware:
 
-#### Frontend
-- `npm run dev` - Start development server
-- `npm run build` - Build for production
-- `npm run preview` - Preview production build
+```mermaid
+flowchart TB
+  R["defineRoute()<br/>auth · zod validation · OpenAPI"] --> S["Services<br/>business rules, transactions"]
+  S --> P["Policies<br/>who may do what"]
+  S --> DB["Prisma (PostgreSQL)"]
+  S -- "publish after commit" --> EB["EventBus"]
+  EB --> N["NotificationsService"] --> WS["Socket.IO push"]
+  S --> AI["AIProvider (strategy)<br/>Gemini · Demo"]
+  S --> C["Cache (strategy)<br/>Redis · Memory"]
+```
 
-#### Backend
-- `npm run dev` - Start development server with hot reload
-- `npm start` - Start production server
-- `npx prisma generate` - Generate Prisma client
-- `npx prisma migrate dev` - Run database migrations
-- `npx prisma studio` - Open Prisma Studio (database GUI)
+There's much more in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md): the data model ERD, sequence diagrams for token rotation, voting and collaborative editing, and the design patterns used.
 
-## Contributing
+## Tech stack
 
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Test thoroughly
-5. Submit a pull request
+| Layer | Choices |
+|---|---|
+| **Web** | React 19, TypeScript (strict), Vite, Tailwind CSS 4, TanStack Query, React Router 7, react-hook-form + zod, Monaco, Yjs (`y-monaco`), Socket.IO client, react-markdown + rehype-sanitize |
+| **API** | Node.js 20, Express 5, TypeScript (strict), Prisma 6, PostgreSQL 16, Socket.IO 4 + Redis adapter, ioredis, Yjs, zod, Pino, `@google/genai`, zod-to-openapi + Swagger UI |
+| **Quality** | Vitest, Supertest, Socket.IO client tests, React Testing Library, Playwright, axe-core, ESLint (typescript-eslint, React hooks), Prettier |
+| **Infrastructure** | Docker (multi-stage), Docker Compose, nginx, GitHub Actions |
+
+## Quick start
+
+### Option A: everything in Docker (recommended)
+
+```bash
+cp .env.example .env
+# set JWT_ACCESS_SECRET, e.g. with: openssl rand -base64 48
+docker compose up --build            # add --scale api=3 to run 3 API replicas
+```
+
+Open http://localhost:8080 and sign in as `ada@devhub.dev` / `password123`. The API docs are at http://localhost:8080/docs.
+
+### Option B: local development with hot reload
+
+Prerequisites: Node.js 20.19+ and Docker (for Postgres and Redis), or your own Postgres 14+.
+
+```bash
+npm install
+npm run db:up                          # postgres + redis via docker compose
+cp apps/api/.env.example apps/api/.env # set JWT_ACCESS_SECRET
+npm run db:migrate && npm run db:seed
+npm run dev                            # API on :4000, web on :5173 (proxied)
+```
+
+Without a `GEMINI_API_KEY`, the AI features use a deterministic demo provider, and the UI labels them as demo responses.
+
+| Script | What it does |
+|---|---|
+| `npm run dev` | API and web with hot reload |
+| `npm test` | Shared, API (needs Postgres) and web unit tests |
+| `npm run e2e` | Playwright end-to-end tests (starts or reuses the dev servers) |
+| `npm run lint` · `npm run typecheck` · `npm run format:check` | Static checks run in CI |
+| `npm run build` | Production builds of every package |
+
+## Testing
+
+There are **93 automated tests**:
+
+| Suite | Count | Covers |
+|---|---|---|
+| API integration (`apps/api/test`) | 60 | Every endpoint against a real Postgres: auth and token rotation with reuse detection, voting idempotency and concurrency, the reputation ledger, accept/un-accept, privacy rules, session capacity races, chat pagination, SSE streaming, schema-validated AI output, PDF magic bytes, sockets (authentication, CRDT sync, identity spoofing), merge-on-save persistence, OpenAPI, metrics |
+| Shared (`packages/shared`) | 8 | Reputation maths and schema normalisation |
+| Web unit and component (`apps/web/src`) | 15 | Single-flight token refresh, open-redirect guard, optimistic votes with rollback, markdown XSS sanitisation |
+| End-to-end (`apps/web/e2e`) | 10 | Sign-up, sign-in and session restore. The two-user ask, answer, vote and accept loop with a live notification. **Two browsers co-editing one session.** axe accessibility checks on five pages |
+
+The E2E suite also passes against the production Docker stack (nginx, two API replicas, Redis, Postgres).
+
+## Project structure
+
+```
+apps/
+  api/                 Express 5 + Socket.IO API
+    prisma/            schema + migrations (FTS triggers, CHECK constraints)
+    src/
+      config/          zod-validated environment
+      core/            errors, validation, policies, event bus, route helper
+      lib/             prisma, logger, cache, metrics
+      middleware/      auth, request ids, logging, rate limits, error handler
+      modules/         auth · questions · snippets · sessions · users · notifications · ai
+      realtime/        Socket.IO gateway + Yjs DocManager
+      container.ts     composition root (dependency injection)
+    test/              integration + unit tests
+  web/                 React SPA
+    src/
+      auth/ theme/     providers
+      components/      UI kit, Markdown, CodeEditor, CollabEditor, Layout
+      lib/             API client, socket, SSE reader, hooks
+      pages/           route components (lazy-loaded)
+    e2e/               Playwright specs
+packages/
+  shared/              zod schemas, DTO types, typed socket events, reputation rules
+docs/                  architecture, system design, ADRs, audit, screenshots
+```
+
+## Documentation
+
+- [Architecture](docs/ARCHITECTURE.md): layers, patterns, data model and sequence diagrams
+- [System design](docs/SYSTEM_DESIGN.md): scaling, caching, consistency, failure modes and capacity
+- [Architecture decision records](docs/adr/)
+- [API](docs/API.md) and [real-time protocol](docs/REALTIME.md). The live OpenAPI docs are served at `/docs`.
+- [Audit report](docs/AUDIT.md): what was wrong with the original MVP and how it was fixed
+- [Security](SECURITY.md) · [Contributing](CONTRIBUTING.md)
+
+## Screenshots
+
+| | |
+|---|---|
+| ![Home](docs/screenshots/home.png) | ![Question with accepted answer](docs/screenshots/question.png) |
+| ![Dashboard](docs/screenshots/dashboard.png) | ![Streaming AI mentor](docs/screenshots/mentor.png) |
+| ![Optional cyberpunk theme](docs/screenshots/cyberpunk.png) | ![Generated OpenAPI docs](docs/screenshots/api-docs.png) |
+
+<p align="center"><img src="docs/screenshots/mobile.png" width="300" alt="Mobile layout" /></p>
 
 ## License
 
-MIT License
+MIT © Pankaj Baid
