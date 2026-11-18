@@ -441,6 +441,11 @@ export class QuestionsService {
       }
     }
 
+    // Serialise concurrent votes by the same user on the same post (double clicks, two tabs).
+    // Without this, both transactions read the same previous vote and apply deltas from a
+    // stale starting point, or one deletes a row the other already deleted (found by load test).
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`vote:${user.id}:${targetId}`}))`;
+
     const key =
       target === 'QUESTION'
         ? { userId_questionId: { userId: user.id, questionId: targetId } }

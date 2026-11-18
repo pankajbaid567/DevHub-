@@ -91,7 +91,14 @@ describe('transactional outbox', () => {
   });
 
   it('backs off a row the queue rejects instead of hot-looping', async () => {
-    const failing = { ...c.queue, add: async () => Promise.reject(new Error('redis down')) };
+    let calls = 0;
+    const failing = {
+      ...c.queue,
+      add: async () => {
+        calls++;
+        throw new Error('redis down');
+      },
+    };
     const relay = new Outbox(c.db, failing as never, c.logger);
     await c.db.outboxEvent.create({
       data: {
@@ -102,8 +109,30 @@ describe('transactional outbox', () => {
     expect(await relay.relayOnce()).toBe(0);
     const row = await c.db.outboxEvent.findFirstOrThrow();
     expect(row).toMatchObject({ attempts: 1, lastError: 'redis down', dispatchedAt: null });
-    expect(row.availableAt.getTime()).toBeGreaterThan(Date.now());
-    expect(await relay.relayOnce()).toBe(0); // not due yet
+    expect(row.lockedUntil!.getTime()).toBeGreaterThan(Date.now());
+    // Backing off: the next passes do not even try the queue.
+    await relay.relayOnce();
+    await relay.relayOnce();
+    expect(calls).toBe(1);
+    // Once the backoff expires, the healthy relay delivers it.
+    await c.db.outboxEvent.updateMany({ data: { lockedUntil: new Date(Date.now() - 1000) } });
+    await settle(c);
+    expect(mailer.sent.map((m) => m.to)).toContain('x@example.com');
+  });
+
+  it('re-sends rows whose lease expired (relay crashed after claiming)', async () => {
+    await c.db.outboxEvent.create({
+      data: {
+        topic: 'email.send',
+        payload: { to: 'lease@example.com', subject: 's', text: 't', html: 'h' },
+        lockedUntil: new Date(Date.now() + 60_000), // claimed by a relay that then died
+      },
+    });
+    await settle(c);
+    expect(mailer.sent).toHaveLength(0); // lease still held
+    await c.db.outboxEvent.updateMany({ data: { lockedUntil: new Date(Date.now() - 60_000) } });
+    await settle(c);
+    expect(mailer.sent.map((m) => m.to)).toEqual(['lease@example.com']);
   });
 
   it('rejects job ids BullMQ would reject, in tests too', async () => {

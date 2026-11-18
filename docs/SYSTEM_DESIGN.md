@@ -78,7 +78,7 @@ sequenceDiagram
   participant W as Worker (any replica)
   S->>PG: BEGIN · INSERT user · INSERT outbox(email.send) · COMMIT
   S-->>R: poke() (low latency; a 2 s poll is the safety net)
-  R->>PG: SELECT … FOR UPDATE SKIP LOCKED LIMIT 50
+  R->>PG: UPDATE … SET lockedUntil = now()+30s WHERE id IN (SELECT … FOR UPDATE SKIP LOCKED LIMIT 50)
   R->>Q: add(job, jobId = outbox-<row id>)
   R->>PG: UPDATE outbox SET dispatchedAt = now()
   Q->>W: lease job
@@ -88,7 +88,8 @@ sequenceDiagram
 - **Why an outbox:** "commit, then enqueue" loses the job if the process dies in between or Redis is down. "Enqueue, then commit" emails people whose sign-up rolled back. Writing the job as a row in the same transaction removes both windows.
 - **Delivery is at-least-once, effects are once:** a relay crash after `add` but before marking the row makes it relay again, but BullMQ ignores a duplicate `jobId`. Handlers check state before acting. The session reminder claims its row with `UPDATE sessions SET "reminderSentAt" = now() WHERE … AND "reminderSentAt" IS NULL RETURNING …`, so concurrent or repeated runs remind once (a test caught the naive check-then-act version sending duplicates).
 - **Scheduling:** a reminder row carries `availableAt = start − 10 min`. Rows due within the hour go to BullMQ as delayed jobs; later ones wait in Postgres, so far-future work never sits in Redis.
-- **Poison rows:** a row the queue rejects backs off quadratically (capped at 5 min) instead of hot-looping the relay. This was observed live, when a job id format BullMQ rejects kept failing. Both queue implementations now enforce BullMQ's id rules, so tests catch it.
+- **Leases, not long transactions:** a relay claims due rows in one statement (`FOR UPDATE SKIP LOCKED` inside an `UPDATE … SET "lockedUntil" = now() + 30 s`), enqueues them and marks them dispatched. No transaction is held open across Redis calls, which had starved a 5-connection pool on CI. If the relay dies, the lease expires and another replica re-sends the rows, deduplicated by job id.
+- **Poison rows:** a row the queue rejects backs off quadratically via `lockedUntil` (capped at 5 min) instead of hot-looping the relay. This was observed live, when a job id format BullMQ rejects kept failing. Both queue implementations now enforce BullMQ's id rules, so tests catch it.
 - **Workers:** every replica relays and (unless `WORKER_ENABLED=false`) consumes. That's competing consumers with leases, so a crashed worker's job is retried elsewhere. Repeating jobs (`maintenance.cleanup` hourly, `search.reconcile` every 10 min) are deduplicated across replicas by their scheduler id. Failed jobs are kept for 7 days as a dead-letter set. Redis runs with AOF persistence and the default `noeviction` policy, which BullMQ requires.
 - **Without Redis** (development, tests), an in-process queue with the same semantics (retries, delays, idempotent ids) runs the same handlers.
 
@@ -165,6 +166,7 @@ Caches are behind the `Cache` interface: Redis in production, an in-memory bound
 | Two relays claiming the same rows | `FOR UPDATE SKIP LOCKED` | `lets several relays run concurrently` |
 | A reminder job delivered twice | Conditional `UPDATE … RETURNING` claim | `schedules a reminder … and sends it once` |
 | A reset link submitted twice | Conditional `UPDATE email_tokens … RETURNING` | `lets only one of two concurrent resets … succeed` |
+| One user voting concurrently on one post (two tabs) | Advisory transaction lock per (user, post) | `stays consistent under a burst of mixed votes` (found by load test) |
 | Two indexers writing one document | Advisory transaction lock plus upsert | `tolerates concurrent indexing of the same document` |
 
 ## Failure modes

@@ -146,6 +146,28 @@ describe('voting and reputation', () => {
     await assertLedgerConsistent(c);
   });
 
+  it('stays consistent under a burst of mixed votes and retractions from one user', async () => {
+    // Regression: found by the k6 load test. Concurrent retractions raced (500 on a
+    // double delete) and could apply deltas from a stale previous vote.
+    const author = await registerUser(app);
+    const voter = await registerUser(app);
+    await grantReputation(c, voter.id, 20); // allowed to downvote
+    const q = await createQuestion(app, author);
+    for (let round = 0; round < 5; round++) {
+      const values = Array.from({ length: 12 }, (_, i) => [1, 0, -1][(i + round) % 3]!);
+      const results = await Promise.all(
+        values.map((value) =>
+          request(app).post(`${Q}/${q.id}/vote`).set(auth(voter)).send({ value }),
+        ),
+      );
+      expect(results.map((r) => r.status).filter((s) => s !== 200)).toEqual([]);
+      const vote = await c.db.vote.findFirst({ where: { userId: voter.id } });
+      const row = await c.db.question.findUniqueOrThrow({ where: { id: q.id } });
+      expect(row.score).toBe(vote?.value ?? 0); // score always matches the surviving vote
+      await assertLedgerConsistent(c);
+    }
+  });
+
   it('charges the voter for answer downvotes', async () => {
     const asker = await registerUser(app);
     const answerer = await registerUser(app);

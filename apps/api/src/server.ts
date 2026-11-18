@@ -23,6 +23,11 @@ async function main(): Promise<void> {
 
   const { app } = createApp(c, { broadcaster });
   const server = http.createServer(app);
+  // Outlive the reverse proxy's idle upstream connections (nginx: 30 s). With Node's 5 s
+  // default, nginx sometimes reuses a socket Node is closing, and POSTs fail with 502
+  // (found by the load test: 5 of 17k votes). headersTimeout must exceed keepAliveTimeout.
+  server.keepAliveTimeout = 65_000;
+  server.headersTimeout = 66_000;
   realtime = attachRealtime(server, c);
 
   await c.db.$connect();

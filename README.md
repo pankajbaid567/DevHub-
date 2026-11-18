@@ -8,7 +8,7 @@
 
 [![CI](https://github.com/pankajbaid567/DevHub-/actions/workflows/ci.yml/badge.svg)](https://github.com/pankajbaid567/DevHub-/actions/workflows/ci.yml)
 ![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178c6)
-![Tests](https://img.shields.io/badge/tests-170%20passing-brightgreen)
+![Tests](https://img.shields.io/badge/tests-173%20passing-brightgreen)
 ![License](https://img.shields.io/badge/license-MIT-blue)
 
 <img src="docs/screenshots/session.png" alt="Two developers editing the same file in real time, with a remote cursor, presence and chat" width="100%" />
@@ -53,6 +53,7 @@ Try it locally with the seeded demo account **`ada@devhub.dev` / `password123`**
 These are the parts I'd point a reviewer to.
 
 - **Verified horizontal scaling.** `docker compose up --scale api=3` runs several stateless API replicas behind nginx. Socket.IO rooms span instances through the Redis adapter, CRDT updates are relayed between instances, and cache and rate limits live in Redis. A test client in the Docker network puts two users on different replicas and confirms they co-edit, chat and see each other ([details](docs/SYSTEM_DESIGN.md#horizontal-scaling)).
+- **Load-tested, with the bugs it found fixed.** With k6 against two replicas behind nginx on one laptop: 44.5k requests at 0 % errors with **p95 7 ms (browse), 14 ms (hybrid search) and 29 ms (40 users voting on the same 3 rows)**, the reputation ledger still exact afterwards, and a capacity knee at **about 2,000 req/s** with no errors. The load test exposed a same-user vote race, keep-alive 502s behind nginx and pool starvation on 2-vCPU machines; each is fixed with a regression test ([report](docs/PERFORMANCE.md)).
 - **Correctness under concurrency, proven by tests.**
   - Votes are idempotent: concurrent duplicate votes become one vote, through a unique constraint plus a bounded retry.
   - The capacity race for the last seat in a session is closed with `SELECT … FOR UPDATE`.
@@ -139,7 +140,7 @@ There's much more in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md): the data mode
 |---|---|
 | **Web** | React 19, TypeScript (strict), Vite, Tailwind CSS 4, TanStack Query, React Router 7, react-hook-form + zod, Monaco, Yjs (`y-monaco`), Socket.IO client, react-markdown + rehype-sanitize |
 | **API** | Node.js 20, Express 5, TypeScript (strict), Prisma 6, PostgreSQL 16 + pgvector, Socket.IO 4 + Redis adapter, ioredis, BullMQ, Nodemailer, Yjs, zod, Pino, `@google/genai` (chat + embeddings), zod-to-openapi + Swagger UI |
-| **Quality** | Vitest, Supertest, Socket.IO client tests, React Testing Library, Playwright, axe-core, ESLint (typescript-eslint, React hooks), Prettier |
+| **Quality** | k6 (load and stress), Vitest, Supertest, Socket.IO client tests, React Testing Library, Playwright, axe-core, ESLint (typescript-eslint, React hooks), Prettier |
 | **Infrastructure** | Docker (multi-stage), Docker Compose, nginx, Mailpit, GitHub Actions |
 
 ## Quick start
@@ -178,11 +179,11 @@ Without a `GEMINI_API_KEY`, the AI features use a deterministic demo provider (l
 
 ## Testing
 
-There are **170 automated tests**:
+There are **173 automated tests**:
 
 | Suite | Count | Covers |
 |---|---|---|
-| API integration and unit (`apps/api/test`) | 114 | Every endpoint against a real Postgres: auth and token rotation with reuse detection, voting idempotency and concurrency, the reputation ledger, accept/un-accept, privacy rules, session capacity races, chat pagination, SSE streaming, schema-validated AI output, PDF magic bytes, sockets (authentication, CRDT sync, identity spoofing), merge-on-save persistence, WebRTC signalling isolation, Gemini fallback and circuit breaker. **Outbox:** rollback writes no job, crash replay delivers once, concurrent relays, poison-row backoff, retries. **Email verification, password reset** (single use, concurrent resets, no enumeration, all devices signed out). **OAuth:** PKCE, state mismatch, open redirect, account linking. **Semantic search:** indexing, unchanged-content skip, reconcile after a model change, concurrent indexing, duplicates, hybrid RRF, RAG citations and graceful degradation. BullMQ against real Redis. **Code runs:** pushed to the room, one-at-a-time lock, outage handling, permissions. |
+| API integration and unit (`apps/api/test`) | 117 | Every endpoint against a real Postgres: auth and token rotation with reuse detection, voting idempotency and concurrency, the reputation ledger, accept/un-accept, privacy rules, session capacity races, chat pagination, SSE streaming, schema-validated AI output, PDF magic bytes, sockets (authentication, CRDT sync, identity spoofing), merge-on-save persistence, WebRTC signalling isolation, Gemini fallback and circuit breaker. **Outbox:** rollback writes no job, crash replay delivers once, concurrent relays, poison-row backoff, retries. **Email verification, password reset** (single use, concurrent resets, no enumeration, all devices signed out). **OAuth:** PKCE, state mismatch, open redirect, account linking. **Semantic search:** indexing, unchanged-content skip, reconcile after a model change, concurrent indexing, duplicates, hybrid RRF, RAG citations and graceful degradation. BullMQ against real Redis. **Code runs:** pushed to the room, one-at-a-time lock, outage handling, permissions. |
 | Code runner (`apps/runner/test`) | 11 | Streams and stdin, runtime errors, infinite-loop kill, child-process group kill, output floods, environment scrubbing, per-run directories, back-pressure, token auth, validation |
 | Shared (`packages/shared`) | 8 | Reputation maths and schema normalisation |
 | Web unit and component (`apps/web/src`) | 15 | Single-flight token refresh, open-redirect guard, optimistic votes with rollback, markdown XSS sanitisation |
@@ -223,6 +224,7 @@ docs/                  architecture, system design, ADRs, audit, screenshots
 
 - [Architecture](docs/ARCHITECTURE.md): layers, patterns, data model and sequence diagrams
 - [System design](docs/SYSTEM_DESIGN.md): scaling, caching, consistency, failure modes and capacity
+- [Performance](docs/PERFORMANCE.md): k6 load and stress results, and the bugs they found
 - [Architecture decision records](docs/adr/)
 - [API](docs/API.md) and [real-time protocol](docs/REALTIME.md). The live OpenAPI docs are served at `/docs`.
 - [Audit report](docs/AUDIT.md): what was wrong with the original MVP and how it was fixed

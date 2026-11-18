@@ -112,28 +112,43 @@ export class NotificationsService {
     link: string,
   ): Promise<void> {
     // The in-app notification and its email (if any) commit together: transactional outbox.
-    const n = await this.db.$transaction(async (tx) => {
-      const row = await tx.notification.create({
-        data: { userId, actorId, type, message, link },
-        include,
-      });
-      if (EMAIL_TYPES.has(type)) {
-        const to = await tx.user.findUnique({
+    // Preferences are read first so the write is one short batch transaction (a single
+    // round trip) rather than an interactive one holding a pooled connection.
+    const wantsEmail = EMAIL_TYPES.has(type)
+      ? await this.db.user.findUnique({
           where: { id: userId },
           select: { email: true, emailVerifiedAt: true, emailNotifications: true },
-        });
-        if (to?.emailVerifiedAt && to.emailNotifications) {
-          const actor = row.actor?.displayName ?? row.actor?.username ?? 'DevHub+';
-          await this.outbox.add(
-            tx,
-            'email.send',
-            emails.notification(to.email, actor, message, `${this.publicUrl}${link}`),
-          );
-        }
-      }
-      return row;
+        })
+      : null;
+    const create = this.db.notification.create({
+      data: { userId, actorId, type, message, link },
+      include,
     });
-    if (EMAIL_TYPES.has(type)) this.outbox.poke();
+    let n: Row;
+    if (wantsEmail?.emailVerifiedAt && wantsEmail.emailNotifications) {
+      const actorRow = actorId
+        ? await this.db.user.findUnique({
+            where: { id: actorId },
+            select: { username: true, displayName: true },
+          })
+        : null;
+      const actor = actorRow?.displayName ?? actorRow?.username ?? 'DevHub+';
+      const email = emails.notification(
+        wantsEmail.email,
+        actor,
+        message,
+        `${this.publicUrl}${link}`,
+      );
+      [n] = await this.db.$transaction([
+        create,
+        this.db.outboxEvent.create({
+          data: { topic: 'email.send', payload: email as unknown as Prisma.InputJsonValue },
+        }),
+      ]);
+      this.outbox.poke();
+    } else {
+      n = await create;
+    }
     this.pusher(userId, toDto(n));
   }
 

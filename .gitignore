@@ -19,3 +19,4 @@ test-results/
 .DS_Store
 .idea/
 *.log
+loadtest/results/

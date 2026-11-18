@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
-import type { ErrorRequestHandler, RequestHandler } from 'express';
+import { BlockList } from 'node:net';
+import type { ErrorRequestHandler, Request, RequestHandler } from 'express';
 import { pinoHttp } from 'pino-http';
 import multer from 'multer';
 import { rateLimit, type Store } from 'express-rate-limit';
@@ -108,7 +109,31 @@ export const errorHandler =
   };
 
 /** Rate limiters share Redis when available, so limits hold across all API instances. */
-export function rateLimiters(redis: Redis | null, opts: { aiPerHour: number; disabled: boolean }) {
+/**
+ * Parses "10.0.0.5,172.16.0.0/12" into a matcher. Used to exempt trusted internal clients
+ * (monitors, load generators) from rate limits without turning limits off for everyone.
+ */
+export function ipAllowlist(spec: string[]): (ip: string | undefined) => boolean {
+  if (!spec.length) return () => false;
+  const list = new BlockList();
+  for (const entry of spec) {
+    const [addr, bits] = entry.split('/');
+    const type = addr!.includes(':') ? 'ipv6' : 'ipv4';
+    if (bits) list.addSubnet(addr!, Number(bits), type);
+    else list.addAddress(addr!, type);
+  }
+  return (ip) => {
+    if (!ip) return false;
+    const v4 = ip.startsWith('::ffff:') ? ip.slice(7) : ip;
+    return list.check(v4, v4.includes(':') ? 'ipv6' : 'ipv4');
+  };
+}
+
+export function rateLimiters(
+  redis: Redis | null,
+  opts: { aiPerHour: number; disabled: boolean; allowlist?: string[] },
+) {
+  const allowed = ipAllowlist(opts.allowlist ?? []);
   const store = (prefix: string): Store | undefined =>
     redis
       ? new RedisStore({
@@ -128,7 +153,7 @@ export function rateLimiters(redis: Redis | null, opts: { aiPerHour: number; dis
     standardHeaders: 'draft-8' as const,
     legacyHeaders: false,
     handler,
-    skip: () => opts.disabled,
+    skip: (req: Request) => opts.disabled || allowed(req.ip),
   };
 
   return {

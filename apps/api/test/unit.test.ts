@@ -189,3 +189,17 @@ describe('email templates', () => {
     expect(m.text).toContain('<script>'); // plain text is not HTML
   });
 });
+
+describe('rate-limit allowlist', () => {
+  it('matches single addresses and CIDR ranges, including IPv4-mapped IPv6', async () => {
+    const { ipAllowlist } = await import('../src/middleware/http.js');
+    const allowed = ipAllowlist(['10.0.0.5', '172.16.0.0/12']);
+    expect(allowed('10.0.0.5')).toBe(true);
+    expect(allowed('172.20.1.9')).toBe(true);
+    expect(allowed('::ffff:172.20.1.9')).toBe(true);
+    expect(allowed('10.0.0.6')).toBe(false);
+    expect(allowed('8.8.8.8')).toBe(false);
+    expect(allowed(undefined)).toBe(false);
+    expect(ipAllowlist([])('10.0.0.5')).toBe(false);
+  });
+});

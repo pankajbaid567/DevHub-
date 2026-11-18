@@ -51,44 +51,56 @@ export class Outbox {
     });
   }
 
-  /** Relays one batch. Returns the number of rows dispatched. */
+  /**
+   * Relays one batch. Returns the number of rows dispatched.
+   *
+   * Claiming is one short statement (no transaction held open across Redis calls, which
+   * starved the connection pool on small machines): due rows are leased for 30 s with
+   * FOR UPDATE SKIP LOCKED, enqueued, then marked dispatched. If the relay dies mid-way the
+   * lease expires and another relay re-sends them; the job id makes that a no-op.
+   */
   async relayOnce(batch = 50): Promise<number> {
-    return this.db.$transaction(async (tx) => {
-      const rows = await tx.$queryRaw<OutboxRow[]>`
-        SELECT id, topic, payload, "availableAt" FROM outbox
-        WHERE "dispatchedAt" IS NULL AND "availableAt" <= now() + interval '1 hour'
+    const rows = await this.db.$queryRaw<OutboxRow[]>`
+      WITH due AS (
+        SELECT id FROM outbox
+        WHERE "dispatchedAt" IS NULL
+          AND "availableAt" <= now() + interval '1 hour'
+          AND ("lockedUntil" IS NULL OR "lockedUntil" < now())
         ORDER BY "availableAt"
         LIMIT ${batch}
-        FOR UPDATE SKIP LOCKED`;
-      if (!rows.length) return 0;
+        FOR UPDATE SKIP LOCKED
+      )
+      UPDATE outbox o SET "lockedUntil" = now() + interval '30 seconds'
+      FROM due WHERE o.id = due.id
+      RETURNING o.id, o.topic, o.payload, o."availableAt"`;
+    if (!rows.length) return 0;
 
-      const done: string[] = [];
-      for (const row of rows) {
-        try {
-          // Rows due within the hour go to the queue as delayed jobs (cheap, precise timing);
-          // later ones wait in the table, so far-future reminders do not sit in Redis.
-          const delayMs = Math.max(0, row.availableAt.getTime() - Date.now());
-          await this.queue.add(row.topic as JobName, row.payload as never, {
-            jobId: `outbox-${row.id}`,
-            ...(delayMs > 0 && { delayMs }),
-          });
-          done.push(row.id);
-        } catch (err) {
-          // Back off (quadratic, capped at 5 min) so a poison row cannot hot-loop the relay.
-          await tx.$executeRaw`
-            UPDATE outbox SET attempts = attempts + 1, "lastError" = ${String((err as Error).message)},
-              "availableAt" = now() + make_interval(secs => LEAST(300, (attempts + 1) * (attempts + 1)))
-            WHERE id = ${row.id}`;
-        }
-      }
-      if (done.length) {
-        await tx.outboxEvent.updateMany({
-          where: { id: { in: done } },
-          data: { dispatchedAt: new Date() },
+    const done: string[] = [];
+    for (const row of rows) {
+      try {
+        // Rows due within the hour go to the queue as delayed jobs (cheap, precise timing);
+        // later ones wait in the table, so far-future reminders do not sit in Redis.
+        const delayMs = Math.max(0, row.availableAt.getTime() - Date.now());
+        await this.queue.add(row.topic as JobName, row.payload as never, {
+          jobId: `outbox-${row.id}`,
+          ...(delayMs > 0 && { delayMs }),
         });
+        done.push(row.id);
+      } catch (err) {
+        // Back off (quadratic, capped at 5 min) so a poison row cannot hot-loop the relay.
+        await this.db.$executeRaw`
+          UPDATE outbox SET attempts = attempts + 1, "lastError" = ${String((err as Error).message)},
+            "lockedUntil" = now() + make_interval(secs => LEAST(300, (attempts + 1) * (attempts + 1)))
+          WHERE id = ${row.id}`;
       }
-      return done.length;
-    });
+    }
+    if (done.length) {
+      await this.db.outboxEvent.updateMany({
+        where: { id: { in: done } },
+        data: { dispatchedAt: new Date(), lockedUntil: null },
+      });
+    }
+    return done.length;
   }
 
   /** Relays until the table has nothing due (used by tests and on shutdown). */

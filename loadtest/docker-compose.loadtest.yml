@@ -1,0 +1,7 @@
+# Overlay for load testing: exempts the compose network (where k6 runs) from per-IP rate
+# limits. Limits stay on for everyone else; production refuses RATE_LIMITS_ENABLED=false.
+services:
+  api:
+    environment:
+      RATE_LIMIT_ALLOWLIST: 172.16.0.0/12,192.168.0.0/16
+      LOG_LEVEL: warn

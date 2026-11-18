@@ -14,6 +14,8 @@ const envSchema = z
       .default('info'),
 
     DATABASE_URL: z.string().url(),
+    /** Connections per process (ignored if DATABASE_URL sets connection_limit). */
+    DB_POOL_SIZE: z.coerce.number().int().min(2).max(100).default(10),
     /** Optional. Without Redis the app runs single-instance with in-memory cache/limits. */
     REDIS_URL: z.string().url().optional(),
 
@@ -81,6 +83,16 @@ const envSchema = z
       .or(z.literal('').transform(() => undefined)),
     RUNNER_TOKEN: z.string().optional(),
     AI_REQUESTS_PER_HOUR: z.coerce.number().int().min(1).max(1_000).default(30),
+    /** IPs/CIDRs exempt from rate limits (internal monitors, load generators). */
+    RATE_LIMIT_ALLOWLIST: z
+      .string()
+      .default('')
+      .transform((s) =>
+        s
+          .split(',')
+          .map((x) => x.trim())
+          .filter(Boolean),
+      ),
     /** Disable only for local load/E2E testing; refused in production. */
     RATE_LIMITS_ENABLED: z
       .enum(['true', 'false'])

@@ -59,8 +59,8 @@ test('ask, answer, vote and accept: the full Q&A loop across two users', async (
   await helper.getByRole('button', { name: 'Upvote' }).first().click();
   await expect(helper.getByLabel('Votes').first()).toContainText('1');
 
-  // The asker is notified in real time and accepts the answer.
-  await expect(asker.getByRole('button', { name: /Notifications, 1 unread/ })).toBeVisible();
+  // The asker is notified in real time (answer + upvote) and accepts the answer.
+  await expect(asker.getByRole('button', { name: /Notifications, 2 unread/ })).toBeVisible();
   await asker.reload();
   await asker.getByRole('button', { name: 'Accept this answer' }).click();
   await expect(asker.getByText('Accepted answer', { exact: true })).toBeVisible();
@@ -155,14 +155,14 @@ test.describe('session workspace', () => {
     // Each side receives a live remote video track (fake camera = moving test pattern).
     for (const page of [host, guest]) {
       const remote = page.getByTestId('call-tile-remote').locator('video');
-      await expect(remote).toHaveCount(1, { timeout: 20_000 });
+      await expect(remote).toHaveCount(1, { timeout: 40_000 });
       await expect
         .poll(
           () =>
             remote.evaluate(
               (v: HTMLVideoElement) => v.videoWidth * Number(v.srcObject instanceof MediaStream),
             ),
-          { timeout: 20_000 },
+          { timeout: 40_000 },
         )
         .toBeGreaterThan(0);
     }

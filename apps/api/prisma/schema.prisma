@@ -166,6 +166,8 @@ model OutboxEvent {
   payload      Json
   availableAt  DateTime  @default(now())
   dispatchedAt DateTime?
+  /// Lease: a relay claimed the row until then (or it is backing off after a failure).
+  lockedUntil  DateTime?
   attempts     Int       @default(0)
   lastError    String?
   createdAt    DateTime  @default(now())
