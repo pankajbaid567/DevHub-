@@ -163,6 +163,8 @@ sequenceDiagram
   S1->>S1: apply merged state (catch up with other replicas)
 ```
 
+The whiteboard lives in the same document (`Y.Array('board')`, one `Y.Map` per stroke with a growing `Y.Array` of points), so it reuses this entire path: relay between replicas, merge-on-save, and catch-up after a reconnect. Video calls use the same socket only for WebRTC signalling (offers, answers and ICE candidates between call members); media flows peer to peer (ADR 0007).
+
 Identity always comes from the handshake JWT. Payloads never carry a trusted user id (the original MVP trusted `userId` from the client).
 
 ### 4.4 AI mentor streaming

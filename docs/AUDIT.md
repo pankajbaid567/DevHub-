@@ -37,6 +37,7 @@ Severity levels: 🔴 critical · 🟠 high · 🟡 medium · ⚪ low.
 
 | # | Sev | Finding | Resolution |
 |---|---|---|---|
+| C9 | 🟠 | **The video call was a facade.** `VideoCall.jsx` showed only the local camera and screen. The server never relayed offers, answers or ICE candidates, so no one else could see or hear you. No whiteboard existed. | Real WebRTC calls with server signalling restricted to call members, and a CRDT-backed collaborative whiteboard. Both are verified by E2E tests with two browsers. |
 | Q1 | 🟠 | No tests at all (only ad-hoc scripts such as `test-ai-curl.sh`). | 93 automated tests including E2E, and CI. |
 | Q2 | 🟡 | 41 ESLint errors; duplicate files (`Register_backup.jsx`, `Register_fixed.jsx`, `Home_Fixed.jsx`), including one that failed to parse. | Strict TypeScript and zero lint warnings in CI. Dead files removed. |
 | Q3 | 🟡 | A single 515 KB JavaScript bundle with no code splitting. Monaco would load from a CDN. | Route-level splitting, and Monaco bundled locally and lazy-loaded. |
@@ -54,7 +55,9 @@ These are worth noting because the tests earned their keep:
 3. **Production-only crash on `/register`.** A catch-all vendor chunk created a circular chunk dependency (a temporal-dead-zone error). E2E against the production build caught it.
 4. **Cross-replica edits were corrupted.** `Uint8Array` payloads didn't survive the Redis adapter's msgpack encoding. The multi-replica Docker test caught it.
 5. **Replicas overwrote each other's document saves.** Fixed with CRDT-merge-on-save under a row lock, with a regression test.
-6. **Colour contrast below WCAG AA** in avatars, status colours and syntax highlighting. axe in E2E caught it.
+6. **nginx sent no security headers on pages or assets.** A `location` with its own `add_header` silently drops inherited headers. The headers are now in a snippet included everywhere, and the CSP no longer allows inline scripts. Found by checking response headers on the Docker stack.
+7. **Retired Gemini models.** The defaults had been retired for new API keys (404). They were switched to current models, and the fallback was hardened with a time-budget split and a circuit breaker after the primary was seen hanging under load.
+8. **Colour contrast below WCAG AA** in avatars, status colours and syntax highlighting. axe in E2E caught it.
 
 ## Preserved work
 

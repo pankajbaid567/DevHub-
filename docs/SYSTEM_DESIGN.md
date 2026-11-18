@@ -57,6 +57,16 @@ This test found two real bugs, both now fixed and covered by regression tests:
 
 **At larger scale** I would route each session to an owner replica (consistent hashing on session id), or use `y-redis` and its streams. That removes duplicated documents and makes persistence single-writer.
 
+## Video calls
+
+Calls are WebRTC **mesh**: each participant uploads one stream per peer.
+
+- At 6 people and about 500 kbps per stream, that's about 2.5 Mbps up per person, which is fine for small pairing rooms. That's why the server caps calls at 6.
+- The server's only cost is signalling (a few dozen small messages per pair), relayed across replicas through the Redis adapter.
+- Membership is checked once per peer pair and cached on the socket, so ICE candidates don't each trigger a cluster lookup.
+- STUN handles most networks. Strict corporate NATs need TURN (for example coturn), which can be enabled through the environment.
+- **Next step:** an SFU (LiveKit or mediasoup) for large rooms, recording and simulcast, keeping the same `rtc:*` signalling contract.
+
 ## Caching
 
 | Data | Strategy | TTL | Invalidation |
@@ -84,7 +94,7 @@ Caches are behind the `Cache` interface: Redis in production, an in-memory bound
 | Failure | Behaviour |
 |---|---|
 | **Redis down** | Readiness check fails (`/ready` returns 503, so the load balancer stops routing). Existing instances keep serving REST, and ioredis retries in the background. In development, the API simply runs without Redis. |
-| **Gemini quota or outage** | Automatic fallback model, then a `503 AI_UNAVAILABLE` with a friendly message. Mentor streams send an `error` event. Nothing else is affected. |
+| **Gemini quota, overload or hang** | The primary model gets 60% of the time budget; then the fallback model runs with the remainder. After 2 consecutive failures a circuit breaker routes straight to the fallback for 60 s. If both fail, a `503 AI_UNAVAILABLE` with a friendly message (mentor streams send an `error` event). This was observed live: the primary returned 503 "high demand" errors, and every feature kept working on the fallback. |
 | **No AI key** | `DemoProvider` gives deterministic, clearly labelled responses. |
 | **Client disconnects mid-edit** | Yjs state is held locally. On reconnect the client re-joins and re-sends its state, and CRDT merging resolves it. |
 | **API instance killed** | `SIGTERM` stops accepting work, flushes dirty documents, closes sockets and pools, with a 10 s forced-exit guard. Debounced edits at risk are at most about 2 s per document, and they still exist on clients and on other replicas. |

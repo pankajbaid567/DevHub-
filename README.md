@@ -4,11 +4,11 @@
 
 # DevHub+
 
-**A real-time developer community: Q&A with reputation, collaborative coding sessions, a snippet library and a streaming AI mentor.**
+**A real-time developer community: Q&A with reputation, live coding sessions with a shared editor, whiteboard and video call, a snippet library and a streaming AI mentor.**
 
 [![CI](https://github.com/pankajbaid567/DevHub-/actions/workflows/ci.yml/badge.svg)](https://github.com/pankajbaid567/DevHub-/actions/workflows/ci.yml)
 ![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178c6)
-![Tests](https://img.shields.io/badge/tests-93%20passing-brightgreen)
+![Tests](https://img.shields.io/badge/tests-102%20passing-brightgreen)
 ![License](https://img.shields.io/badge/license-MIT-blue)
 
 <img src="docs/screenshots/session.png" alt="Two developers editing the same file in real time, with a remote cursor, presence and chat" width="100%" />
@@ -33,13 +33,17 @@
 |---|---|
 | **Q&A with reputation** | Ask, answer, vote and accept answers. Reputation is computed in the same database transaction as each vote and recorded in an auditable ledger. Postgres full-text search with ranking and `"phrase"`, `-exclude` and `or` syntax. |
 | **Live collaborative coding** | A shared Monaco editor synchronised with **Yjs CRDTs** over Socket.IO, with remote cursors, presence, typing indicators and chat. Private sessions use invite codes. Capacity is enforced under a row lock, and the host can start and end sessions. |
+| **Shared whiteboard** | Draw together in the same session, with live strokes and remote cursors. It has pen, highlighter, eraser, colours and widths, per-user undo and redo (Yjs `UndoManager`), host-only clear and PNG export. It is stored in the same CRDT document as the code, so it syncs across servers and persists automatically. |
+| **Video and voice calls** | **WebRTC** peer-to-peer calls in each session, with mute, camera, screen share (switched in place with `replaceTrack`), a speaking indicator and automatic rejoin. Uses perfect negotiation, server-side signalling restricted to call members, and STUN plus optional TURN. Up to 6 people (mesh). |
 | **Streaming AI mentor** | Multi-turn conversations streamed token by token over Server-Sent Events, with topic-specific system prompts (debugging, code review, system design and more) and saved history. |
-| **Career tools** | Upload a resume PDF and get a structured, schema-validated review (scores, ATS keywords, top actions). Self-rated skills become a phased roadmap. |
+| **AI resume analyser and skills** | On your own profile (private tabs): upload a resume PDF and get a Gemini-powered, schema-validated review (0–100 scores per section, ATS keywords present and missing, top actions), with review history. Self-rated skills become a phased roadmap. |
 | **Snippet library** | Share, star and fork code, with public, unlisted or private visibility and full-text search across title, description and code. |
 | **Notifications** | Answers, acceptances, upvotes, stars and session starts are pushed live to every open tab. |
 | **Polished UI** | Light, dark and an optional cyberpunk theme, mobile-first layouts, optimistic updates, skeletons and empty states. WCAG AA contrast is verified with axe. |
 
 Try it locally with the seeded demo account **`ada@devhub.dev` / `password123`**.
+
+<img src="docs/screenshots/whiteboard-call.png" alt="A live session with a peer-to-peer video call and a shared whiteboard with a remote cursor" width="100%" />
 
 ## Engineering highlights
 
@@ -51,6 +55,11 @@ These are the parts I'd point a reviewer to.
   - The capacity race for the last seat in a session is closed with `SELECT … FOR UPDATE`.
   - Document saves CRDT-merge under a row lock instead of overwriting each other.
   - The reputation ledger invariant `users.reputation = SUM(events)` is asserted after each scenario.
+- **Resilient AI integration.** Gemini sits behind a provider interface:
+  - The primary model gets 60% of the time budget, and a timeout or overload falls back to a second model.
+  - A circuit breaker skips a failing primary for 60 seconds.
+  - Structured output is validated with zod before it's stored.
+  - All of this is unit-tested with a fake client.
 - **Security by design.**
   - Access tokens live only in memory (15 minutes).
   - Refresh tokens are httpOnly, `SameSite=Strict` cookies that rotate on every use, with reuse detection that revokes the whole token family.
@@ -146,14 +155,14 @@ Without a `GEMINI_API_KEY`, the AI features use a deterministic demo provider, a
 
 ## Testing
 
-There are **93 automated tests**:
+There are **102 automated tests**:
 
 | Suite | Count | Covers |
 |---|---|---|
-| API integration (`apps/api/test`) | 60 | Every endpoint against a real Postgres: auth and token rotation with reuse detection, voting idempotency and concurrency, the reputation ledger, accept/un-accept, privacy rules, session capacity races, chat pagination, SSE streaming, schema-validated AI output, PDF magic bytes, sockets (authentication, CRDT sync, identity spoofing), merge-on-save persistence, OpenAPI, metrics |
+| API integration and unit (`apps/api/test`) | 66 | Every endpoint against a real Postgres: auth and token rotation with reuse detection, voting idempotency and concurrency, the reputation ledger, accept/un-accept, privacy rules, session capacity races, chat pagination, SSE streaming, schema-validated AI output, PDF magic bytes, sockets (authentication, CRDT sync, identity spoofing), merge-on-save persistence, WebRTC signalling isolation, Gemini fallback and circuit breaker, OpenAPI, metrics |
 | Shared (`packages/shared`) | 8 | Reputation maths and schema normalisation |
 | Web unit and component (`apps/web/src`) | 15 | Single-flight token refresh, open-redirect guard, optimistic votes with rollback, markdown XSS sanitisation |
-| End-to-end (`apps/web/e2e`) | 10 | Sign-up, sign-in and session restore. The two-user ask, answer, vote and accept loop with a live notification. **Two browsers co-editing one session.** axe accessibility checks on five pages |
+| End-to-end (`apps/web/e2e`) | 13 | Sign-up, sign-in and session restore. The two-user ask, answer, vote and accept loop with a live notification. **Two browsers co-editing one session.** **A whiteboard stroke syncing (and undo).** **A two-way video call with live remote video and mute state.** Profile-only resume tools. axe accessibility checks on five pages |
 
 The E2E suite also passes against the production Docker stack (nginx, two API replicas, Redis, Postgres).
 
@@ -175,8 +184,8 @@ apps/
   web/                 React SPA
     src/
       auth/ theme/     providers
-      components/      UI kit, Markdown, CodeEditor, CollabEditor, Layout
-      lib/             API client, socket, SSE reader, hooks
+      components/      UI kit, Markdown, CodeEditor, CollabEditor, Whiteboard, CallPanel, Layout
+      lib/             API client, socket, SSE reader, useSessionDoc (Yjs), useCall (WebRTC), hooks
       pages/           route components (lazy-loaded)
     e2e/               Playwright specs
 packages/

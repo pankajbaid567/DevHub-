@@ -50,7 +50,7 @@ Every error has the same shape:
 `POST /ai/conversations/:id/messages` responds with `text/event-stream`. Each frame is `data: <json>\n\n`, where the JSON is a `MentorStreamEvent`:
 
 ```
-{"type":"start","messageId":"…","model":"gemini-2.5-flash"}
+{"type":"start","messageId":"…","model":"gemini-3.8-flash"}
 {"type":"delta","text":"Start by "}
 …
 {"type":"done","messageId":"…","title":"Debugging a slow API"}
