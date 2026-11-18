@@ -1,0 +1,561 @@
+/* ============================================================================
+   PERFORMANCE OPTIMIZATIONS
+   ============================================================================ */
+
+/* === GPU ACCELERATION === */
+
+/* Force GPU acceleration for animations and transforms */
+.gpu-accelerated {
+  transform: translateZ(0);
+  backface-visibility: hidden;
+  perspective: 1000px;
+}
+
+.will-change-transform {
+  will-change: transform;
+}
+
+.will-change-opacity {
+  will-change: opacity;
+}
+
+.will-change-scroll {
+  will-change: scroll-position;
+}
+
+.will-change-auto {
+  will-change: auto;
+}
+
+/* === EFFICIENT ANIMATIONS === */
+
+/* Prefer transforms and opacity for animations */
+.efficient-fade {
+  opacity: 0;
+  transition: opacity var(--duration-normal) var(--ease-out-cubic);
+}
+
+.efficient-fade.is-visible {
+  opacity: 1;
+}
+
+.efficient-slide {
+  transform: translateY(20px);
+  opacity: 0;
+  transition: 
+    transform var(--duration-normal) var(--ease-out-cubic),
+    opacity var(--duration-normal) var(--ease-out-cubic);
+}
+
+.efficient-slide.is-visible {
+  transform: translateY(0);
+  opacity: 1;
+}
+
+.efficient-scale {
+  transform: scale(0.9);
+  opacity: 0;
+  transition: 
+    transform var(--duration-normal) var(--ease-out-cubic),
+    opacity var(--duration-normal) var(--ease-out-cubic);
+}
+
+.efficient-scale.is-visible {
+  transform: scale(1);
+  opacity: 1;
+}
+
+/* === OPTIMIZED LAYOUTS === */
+
+/* Use transform instead of changing position */
+.optimized-move {
+  transition: transform var(--duration-normal) var(--ease-out-cubic);
+}
+
+.optimized-move:hover {
+  transform: translateY(-4px);
+}
+
+/* Use transform for centering instead of margin auto */
+.optimized-center {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+}
+
+/* === CONTAINMENT === */
+
+/* CSS Containment for better performance */
+.contain-layout {
+  contain: layout;
+}
+
+.contain-style {
+  contain: style;
+}
+
+.contain-paint {
+  contain: paint;
+}
+
+.contain-size {
+  contain: size;
+}
+
+.contain-strict {
+  contain: strict;
+}
+
+.contain-content {
+  contain: content;
+}
+
+/* === LAYERING OPTIMIZATIONS === */
+
+/* Create new stacking contexts efficiently */
+.new-layer {
+  isolation: isolate;
+}
+
+.force-layer {
+  transform: translateZ(0);
+}
+
+/* === FONT LOADING OPTIMIZATIONS === */
+
+/* Font display optimizations */
+@font-face {
+  font-family: 'OptimizedFont';
+  src: url('font.woff2') format('woff2');
+  font-display: swap; /* Improves perceived performance */
+}
+
+/* Reduce font variations for better performance */
+.text-optimized {
+  font-feature-settings: "kern" 1;
+  text-rendering: optimizeLegibility;
+}
+
+/* === IMAGE OPTIMIZATIONS === */
+
+/* Optimized image loading */
+.img-optimized {
+  max-width: 100%;
+  height: auto;
+  display: block;
+  image-rendering: -webkit-optimize-contrast;
+  image-rendering: crisp-edges;
+}
+
+/* Lazy loading placeholder */
+.img-lazy {
+  background: linear-gradient(90deg, 
+    var(--color-muted) 0%, 
+    rgba(255, 255, 255, 0.1) 50%, 
+    var(--color-muted) 100%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+/* Picture element optimization */
+.picture-optimized {
+  display: block;
+  width: 100%;
+}
+
+.picture-optimized img {
+  width: 100%;
+  height: auto;
+  display: block;
+  object-fit: cover;
+}
+
+/* === SCROLL OPTIMIZATIONS === */
+
+/* Smooth scrolling optimization */
+.scroll-optimized {
+  scroll-behavior: smooth;
+  overflow-anchor: auto;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .scroll-optimized {
+    scroll-behavior: auto;
+  }
+}
+
+/* Virtual scrolling container */
+.virtual-scroll {
+  height: 100%;
+  overflow-y: auto;
+  will-change: scroll-position;
+}
+
+/* Infinite scroll optimization */
+.infinite-scroll {
+  height: 100vh;
+  overflow-y: auto;
+  scroll-snap-type: y mandatory;
+}
+
+.infinite-scroll-item {
+  scroll-snap-align: start;
+  contain: content;
+}
+
+/* === RENDERING OPTIMIZATIONS === */
+
+/* Optimize repaints */
+.no-repaint {
+  backface-visibility: hidden;
+  transform: translateZ(0);
+}
+
+/* Optimize text rendering */
+.text-sharp {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+/* Optimize animations */
+.animation-optimized {
+  animation-fill-mode: both;
+  animation-play-state: paused;
+}
+
+.animation-optimized.in-view {
+  animation-play-state: running;
+}
+
+/* === MEMORY OPTIMIZATIONS === */
+
+/* Reduce memory usage for large lists */
+.memory-efficient {
+  content-visibility: auto;
+  contain-intrinsic-size: 200px;
+}
+
+/* Efficient grid rendering */
+.grid-efficient {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: var(--space-4);
+  content-visibility: auto;
+}
+
+/* === CRITICAL CSS PATTERNS === */
+
+/* Above-the-fold optimizations */
+.above-fold {
+  /* Critical styles that should load first */
+  font-family: system-ui, -apple-system, sans-serif;
+  line-height: 1.5;
+  color: #333;
+  background: #fff;
+}
+
+/* Below-the-fold can use more complex styles */
+.below-fold {
+  /* Non-critical styles */
+  font-family: var(--font-family-primary);
+  transition: all var(--duration-normal) ease;
+}
+
+/* === INTERSECTION OBSERVER OPTIMIZATIONS === */
+
+/* Fade in when visible */
+.fade-in-view {
+  opacity: 0;
+  transform: translateY(20px);
+  transition: 
+    opacity 0.6s ease-out,
+    transform 0.6s ease-out;
+}
+
+.fade-in-view.in-view {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* Stagger animations */
+.stagger-item {
+  opacity: 0;
+  transform: translateY(20px);
+  transition: 
+    opacity 0.6s ease-out,
+    transform 0.6s ease-out;
+}
+
+.stagger-item:nth-child(1) { transition-delay: 0.1s; }
+.stagger-item:nth-child(2) { transition-delay: 0.2s; }
+.stagger-item:nth-child(3) { transition-delay: 0.3s; }
+.stagger-item:nth-child(4) { transition-delay: 0.4s; }
+.stagger-item:nth-child(5) { transition-delay: 0.5s; }
+
+.stagger-item.in-view {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* === LOADING STATES === */
+
+/* Efficient loading spinner */
+.spinner-efficient {
+  width: 20px;
+  height: 20px;
+  border: 2px solid var(--color-muted);
+  border-top-color: var(--color-primary);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  will-change: transform;
+}
+
+/* Skeleton loading */
+.skeleton {
+  background: linear-gradient(90deg,
+    var(--color-muted) 25%,
+    rgba(255, 255, 255, 0.1) 50%,
+    var(--color-muted) 75%
+  );
+  background-size: 200% 100%;
+  animation: skeleton-loading 1.5s infinite;
+}
+
+@keyframes skeleton-loading {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.skeleton-text {
+  height: 1em;
+  margin-bottom: 0.5em;
+  border-radius: 4px;
+}
+
+.skeleton-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+}
+
+.skeleton-button {
+  width: 100px;
+  height: 40px;
+  border-radius: 6px;
+}
+
+/* === DEBOUNCED EFFECTS === */
+
+/* Debounced hover effects */
+.debounced-hover {
+  transition: transform 0.15s ease-out;
+}
+
+.debounced-hover:hover {
+  transform: translateY(-2px);
+  transition-delay: 0.1s;
+}
+
+/* === EFFICIENT GRADIENTS === */
+
+/* Use conic gradients for better performance */
+.efficient-gradient {
+  background: conic-gradient(
+    from 0deg,
+    var(--color-primary),
+    var(--color-secondary),
+    var(--color-primary)
+  );
+}
+
+/* Optimized radial gradients */
+.efficient-radial {
+  background: radial-gradient(
+    circle at center,
+    var(--color-primary) 0%,
+    var(--color-secondary) 100%
+  );
+}
+
+/* === VENDOR PREFIXES OPTIMIZATION === */
+
+/* Modern flexbox without legacy prefixes */
+.flex-modern {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+}
+
+/* Modern grid without legacy prefixes */
+.grid-modern {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 1rem;
+}
+
+/* === CRITICAL RESOURCE HINTS === */
+
+/* 
+Add these to your HTML head for optimal performance:
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="preload" href="/critical.css" as="style">
+<link rel="prefetch" href="/non-critical.css">
+*/
+
+/* === PERFORMANCE MONITORING === */
+
+/* Visual debugging for performance */
+.perf-debug * {
+  outline: 1px solid red !important;
+}
+
+.perf-debug .expensive-operation {
+  background: rgba(255, 0, 0, 0.1) !important;
+}
+
+/* Paint debugging */
+.paint-debug {
+  background: rgba(0, 255, 0, 0.1);
+  outline: 1px solid green;
+}
+
+/* Layout debug */
+.layout-debug {
+  background: rgba(0, 0, 255, 0.1);
+  outline: 1px solid blue;
+}
+
+/* === CRITICAL PATH OPTIMIZATIONS === */
+
+/* Inline critical CSS styles */
+.critical-button {
+  display: inline-block;
+  padding: 8px 16px;
+  background: #007bff;
+  color: white;
+  text-decoration: none;
+  border-radius: 4px;
+  border: none;
+  cursor: pointer;
+}
+
+.critical-card {
+  background: white;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  padding: 16px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+/* === ASYNC CSS LOADING === */
+
+/* Styles for non-critical CSS that loads asynchronously */
+.async-loaded {
+  /* These styles only apply after non-critical CSS loads */
+  transition: all 0.3s ease;
+  transform: translateY(0);
+}
+
+/* Fallback styles before async CSS loads */
+.async-fallback {
+  /* Simple fallback styles */
+  background: #f5f5f5;
+  padding: 16px;
+  margin: 8px 0;
+}
+
+/* === PREFETCH OPTIMIZATIONS === */
+
+/* Hover intent optimizations */
+.prefetch-hover:hover + .prefetch-content {
+  /* Trigger prefetch on hover */
+  content-visibility: visible;
+}
+
+.prefetch-content {
+  content-visibility: hidden;
+}
+
+/* === MODERN CSS FEATURES === */
+
+/* Use modern CSS for better performance */
+.modern-container {
+  container-type: inline-size;
+}
+
+.modern-scroll {
+  scroll-timeline: --scroll-timeline;
+  animation: scroll-animation linear;
+  animation-timeline: --scroll-timeline;
+}
+
+@keyframes scroll-animation {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* CSS cascade layers for better performance */
+@layer base, components, utilities;
+
+@layer utilities {
+  .u-hidden {
+    display: none;
+  }
+  
+  .u-visible {
+    display: block;
+  }
+}
+
+/* === PERFORMANCE UTILITY CLASSES === */
+
+.performance-boost {
+  /* Combination of performance optimizations */
+  will-change: transform, opacity;
+  backface-visibility: hidden;
+  transform: translateZ(0);
+  contain: layout style paint;
+}
+
+.memory-efficient-list {
+  /* For large lists */
+  content-visibility: auto;
+  contain-intrinsic-size: 100px;
+}
+
+.cpu-efficient {
+  /* Reduce CPU usage */
+  pointer-events: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.render-efficient {
+  /* Reduce render cost */
+  isolation: isolate;
+  contain: paint layout;
+}
+

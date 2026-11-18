@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { useTheme } from '../contexts/ThemeContext';
 import { 
   Home, 
   HelpCircle, 
@@ -22,15 +23,12 @@ import {
 
 const Navbar = () => {
   const { user, logout, isAuthenticated } = useAuth();
+  const { theme, toggleTheme, isCyberpunk } = useTheme();
   const location = useLocation();
   const navigate = useNavigate();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
-  const [isDarkMode, setIsDarkMode] = useState(
-    localStorage.getItem('theme') === 'dark' || 
-    (!localStorage.getItem('theme') && window.matchMedia('(prefers-color-scheme: dark)').matches)
-  );
 
   // Handle scroll effect for navbar
   useEffect(() => {
@@ -41,15 +39,6 @@ const Navbar = () => {
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
-  React.useEffect(() => {
-    if (isDarkMode) {
-      document.documentElement.classList.add('dark');
-      localStorage.setItem('theme', 'dark');
-    } else {
-      document.documentElement.classList.remove('dark');
-      localStorage.setItem('theme', 'light');
-    }
-  }, [isDarkMode]);
 
   const handleLogout = () => {
     logout();
@@ -57,9 +46,6 @@ const Navbar = () => {
     setIsMobileMenuOpen(false);
   };
 
-  const toggleTheme = () => {
-    setIsDarkMode(!isDarkMode);
-  };
 
   const navItems = [
     { path: '/', label: 'Home', icon: Home, badge: null },
@@ -74,8 +60,21 @@ const Navbar = () => {
     return location.pathname.startsWith(path);
   };
 
+  const getThemeIcon = () => {
+    switch (theme) {
+      case 'light':
+        return <Moon className="h-5 w-5" />;
+      case 'dark':
+        return <Zap className="h-5 w-5" />;
+      case 'cyberpunk':
+        return <Sun className="h-5 w-5" />;
+      default:
+        return <Zap className="h-5 w-5" />;
+    }
+  };
+
   return (
-    <nav className={`navbar ${isScrolled ? 'scrolled' : 'not-scrolled'}`}>
+    <nav className={`navbar ${isScrolled ? 'scrolled' : 'not-scrolled'} ${isCyberpunk ? 'cyber-glow' : ''}`}>
       <div className="navbar-container">
         <div className="navbar-content">
           {/* Logo */}
@@ -84,15 +83,15 @@ const Navbar = () => {
             className="navbar-logo"
             aria-label="DevHub+ - Go to homepage"
           >
-            <div className="navbar-logo-icon" role="img" aria-label="DevHub+ logo">
-              <Code className="h-7 w-7 text-white" aria-hidden="true" />
+            <div className={`navbar-logo-icon ${isCyberpunk ? 'cyber-glow-blue' : ''}`} role="img" aria-label="DevHub+ logo">
+              <Code className={`h-7 w-7 text-white ${isCyberpunk ? 'cyber-animate-pulse' : ''}`} aria-hidden="true" />
             </div>
             <div className="navbar-logo-text">
-              <span className="navbar-logo-title" role="text">
+              <span className={`navbar-logo-title ${isCyberpunk ? 'cyber-glow-pink' : ''}`} role="text">
                 DevHub+
               </span>
-              <span className="navbar-logo-subtitle">
-                Developer Platform
+              <span className={`navbar-logo-subtitle ${isCyberpunk ? 'text-cyber-text-accent' : ''}`}>
+                {isCyberpunk ? 'CYBER PLATFORM' : 'Developer Platform'}
               </span>
             </div>
           </Link>
@@ -146,14 +145,11 @@ const Navbar = () => {
             {/* Theme Toggle */}
             <button
               onClick={toggleTheme}
-              className="navbar-action-btn"
-              aria-label="Toggle theme"
+              className={`navbar-action-btn ${isCyberpunk ? 'cyber-glow-green' : ''}`}
+              aria-label={`Switch to ${theme === 'light' ? 'dark' : theme === 'dark' ? 'cyberpunk' : 'light'} theme`}
+              title={`Current: ${theme} theme`}
             >
-              {isDarkMode ? (
-                <Sun className="h-5 w-5" />
-              ) : (
-                <Moon className="h-5 w-5" />
-              )}
+              {getThemeIcon()}
             </button>
 
             {isAuthenticated ? (

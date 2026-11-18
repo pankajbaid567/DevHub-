@@ -1,4 +1,42 @@
-/* CSS Custom Properties (Variables) */
+/* ============================================================================
+   DEVHUB+ MASTER STYLESHEET
+   Modern CSS Architecture with Best Practices
+   ============================================================================ */
+
+/* === IMPORTS === */
+@import './styles/design-tokens.css';  /* Design system tokens */
+@import './styles/foundation.css';     /* Reset, base styles, typography */
+@import './styles/layout.css';         /* Grid, flexbox, layout patterns */
+@import './styles/components.css';     /* UI component library */
+@import './styles/animations.css';     /* Animations and micro-interactions */
+@import './styles/responsive.css';     /* Responsive design utilities */
+@import './styles/accessibility.css';  /* Accessibility features */
+@import './styles/performance.css';    /* Performance optimizations */
+@import './styles/utilities.css';      /* Utility classes */
+
+/* === DARK MODE OVERRIDES === */
+.dark {
+  /* Dark mode color overrides */
+  --color-bg-primary: var(--color-slate-900);
+  --color-bg-secondary: var(--color-slate-800);
+  --color-card: var(--color-slate-800);
+  --color-input: var(--color-slate-800);
+  --color-muted: var(--color-slate-700);
+  --color-border: var(--color-slate-700);
+  
+  --color-text-primary: var(--color-slate-50);
+  --color-text-secondary: var(--color-slate-300);
+  --color-text-muted: var(--color-slate-400);
+  --color-text-heading: var(--color-slate-50);
+  
+  /* Update shadows for dark mode */
+  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.3);
+  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.4), 0 2px 4px -2px rgb(0 0 0 / 0.3);
+  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.4), 0 4px 6px -4px rgb(0 0 0 / 0.3);
+  --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.4), 0 8px 10px -6px rgb(0 0 0 / 0.3);
+}
+
+/* === LEGACY VARIABLE COMPATIBILITY === */
 :root {
   /* Colors */
   --primary-50: #eef2ff;
@@ -19,13 +57,129 @@
   --accent-400: #34d399;
   --accent-500: #10b981;
   --accent-600: #059669;
-  --accent-700: #047857;
-  --accent-800: #065f46;
-  --accent-900: #064e3b;
+  /* Legacy color variables for backward compatibility */
+  --primary-50: var(--color-primary-50);
+  --primary-100: var(--color-primary-100);
+  --primary-200: var(--color-primary-200);
+  --primary-300: var(--color-primary-300);
+  --primary-400: var(--color-primary-400);
+  --primary-500: var(--color-primary-500);
+  --primary-600: var(--color-primary-600);
+  --primary-700: var(--color-primary-700);
+  --primary-800: var(--color-primary-800);
+  --primary-900: var(--color-primary-900);
+  
+  --accent-50: var(--color-secondary-50);
+  --accent-100: var(--color-secondary-100);
+  --accent-200: var(--color-secondary-200);
+  --accent-300: var(--color-secondary-300);
+  --accent-400: var(--color-secondary-400);
+  --accent-500: var(--color-secondary-500);
+  --accent-600: var(--color-secondary-600);
+  --accent-700: var(--color-secondary-700);
+  --accent-800: var(--color-secondary-800);
+  --accent-900: var(--color-secondary-900);
   
   --slate-50: #f8fafc;
-  --slate-1.dark .hover\\:text-primary-700:hover {
-  color: var(--primary-300);
+  --slate-50: var(--color-slate-50);
+  --slate-100: var(--color-slate-100);
+  --slate-200: var(--color-slate-200);
+  --slate-300: var(--color-slate-300);
+  --slate-400: var(--color-slate-400);
+  --slate-500: var(--color-slate-500);
+  --slate-600: var(--color-slate-600);
+  --slate-700: var(--color-slate-700);
+  --slate-800: var(--color-slate-800);
+  --slate-900: var(--color-slate-900);
+  
+  /* Legacy spacing variables */
+  --spacing-xs: var(--space-1);
+  --spacing-sm: var(--space-2);
+  --spacing-md: var(--space-4);
+  --spacing-lg: var(--space-6);
+  --spacing-xl: var(--space-8);
+  --spacing-2xl: var(--space-12);
+  --spacing-3xl: var(--space-16);
+  
+  /* Legacy radius variables */
+  --radius-sm: var(--border-radius-sm);
+  --radius-md: var(--border-radius-md);
+  --radius-lg: var(--border-radius-lg);
+  --radius-xl: var(--border-radius-xl);
+  --radius-2xl: var(--border-radius-2xl);
+  
+  /* Legacy font variables */
+  --font-sans: var(--font-family-primary);
+  --font-mono: var(--font-family-mono);
+  
+  /* Legacy shadow variables */
+  --shadow-sm: var(--shadow-sm);
+  --shadow-md: var(--shadow-md);
+  --shadow-lg: var(--shadow-lg);
+  --shadow-xl: var(--shadow-xl);
+
+/* === CYBERPUNK NAVBAR STYLES === */
+
+.cyber-theme .navbar {
+  background: rgba(10, 10, 10, 0.9);
+  backdrop-filter: blur(20px);
+  border-bottom: 1px solid var(--cyber-neon-blue);
+  box-shadow: 
+    var(--cyber-glow-blue),
+    0 8px 32px rgba(0, 0, 0, 0.8);
+  position: relative;
+}
+
+.cyber-theme .navbar::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: var(--cyber-scanlines);
+  opacity: 0.1;
+  pointer-events: none;
+}
+
+.cyber-theme .navbar.scrolled {
+  background: rgba(10, 10, 10, 0.95);
+  border-bottom-color: var(--cyber-neon-pink);
+  box-shadow: var(--cyber-glow-pink);
+}
+
+.cyber-theme .navbar-nav-item {
+  position: relative;
+  transition: all var(--cyber-duration-normal) var(--cyber-ease-cyber);
+}
+
+.cyber-theme .navbar-nav-item:hover {
+  text-shadow: var(--cyber-glow-sm);
+  transform: translateY(-1px);
+}
+
+.cyber-theme .navbar-nav-item.active {
+  color: var(--cyber-neon-pink);
+  background: var(--cyber-gradient-card);
+  border: 1px solid var(--cyber-neon-pink);
+  box-shadow: var(--cyber-glow-pink);
+  text-shadow: var(--cyber-glow-sm);
+}
+
+.cyber-theme .navbar-nav-item.highlight {
+  animation: cyber-glow-pulse var(--cyber-duration-slower) ease-in-out infinite;
+}
+
+.cyber-theme .navbar-action-btn {
+  transition: all var(--cyber-duration-normal) var(--cyber-ease-cyber);
+}
+
+.cyber-theme .navbar-action-btn:hover {
+  transform: scale(1.1);
+  text-shadow: var(--cyber-glow-sm);
+}
+
+.cyber-theme .navbar-user-dropdown {
+  background: var(--cyber-bg-card);
+  border: 1px solid var(--cyber-neon-blue);
+  box-shadow: var(--cyber-glow-blue);
 }
 
 /* Component Styles */
@@ -630,10 +784,43 @@
 /* Cursor helpers */
 .cursor-pointer { cursor: pointer; }
 
-/* Button disabled states */
+/* Cyberpunk Button States */
 .btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+  filter: grayscale(1);
+  box-shadow: none;
+  animation: none;
+}
+
+.btn:active {
+  transform: translateY(1px);
+}
+
+/* Cyberpunk Loading Button */
+.btn-loading {
+  position: relative;
+  color: transparent;
+}
+
+.btn-loading::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  width: 16px;
+  height: 16px;
+  border: 2px solid transparent;
+  border-top-color: currentColor;
+  border-radius: 50%;
+  animation: spin var(--cyber-duration-slower) linear infinite;
+  color: var(--cyber-neon-blue);
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 /* Gradients system */
@@ -1732,52 +1919,162 @@ html {
 
 body {
   margin: 0;
-  font-family: var(--font-sans);
-  line-height: inherit;
-  color: var(--slate-900);
-  background-color: var(--slate-50);
+  font-family: var(--cyber-font-secondary);
+  line-height: 1.6;
+  color: var(--cyber-text-primary);
+  background: var(--cyber-bg-primary);
+  overflow-x: hidden;
+}
+
+/* Cyberpunk Body Styling */
+body.cyber-theme {
+  background: var(--cyber-gradient-background);
+  background-attachment: fixed;
+  font-family: var(--cyber-font-primary);
+}
+
+/* Add cyberpunk background effects */
+body.cyber-theme::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background: var(--cyber-grid);
+  background-size: 40px 40px;
+  opacity: 0.1;
+  pointer-events: none;
+  z-index: -1;
+}
+
+/* Scanning line effect */
+body.cyber-theme::after {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, transparent, var(--cyber-neon-blue), transparent);
+  animation: cyber-scan 3s linear infinite;
+  z-index: var(--cyber-z-max);
+  pointer-events: none;
 }
 
 .dark body {
-  color: var(--slate-50);
-  background-color: var(--slate-900);
+  color: var(--cyber-text-primary);
+  background-color: var(--cyber-bg-primary);
 }
 
-/* Typography */
+/* Cyberpunk Typography */
 h1, h2, h3, h4, h5, h6 {
-  font-weight: 600;
-  line-height: 1.25;
-  margin-bottom: var(--spacing-md);
+  font-family: var(--cyber-font-accent);
+  font-weight: var(--cyber-font-bold);
+  line-height: 1.2;
+  margin-bottom: var(--cyber-space-4);
+  color: var(--cyber-text-primary);
+  text-shadow: var(--cyber-glow-sm);
+  letter-spacing: 0.02em;
 }
 
-h1 { font-size: 2.25rem; }
-h2 { font-size: 1.875rem; }
-h3 { font-size: 1.5rem; }
-h4 { font-size: 1.25rem; }
-h5 { font-size: 1.125rem; }
-h6 { font-size: 1rem; }
+h1 {
+  font-size: var(--cyber-text-5xl);
+  background: var(--cyber-gradient-primary);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  text-shadow: none;
+}
+
+h2 {
+  font-size: var(--cyber-text-4xl);
+  color: var(--cyber-neon-blue);
+}
+
+h3 {
+  font-size: var(--cyber-text-3xl);
+  color: var(--cyber-neon-purple);
+}
+
+h4 {
+  font-size: var(--cyber-text-2xl);
+  color: var(--cyber-neon-pink);
+}
+
+h5 {
+  font-size: var(--cyber-text-xl);
+  color: var(--cyber-neon-green);
+}
+
+h6 {
+  font-size: var(--cyber-text-lg);
+  color: var(--cyber-text-accent);
+}
 
 p {
-  margin-bottom: var(--spacing-md);
-  line-height: 1.6;
+  margin-bottom: var(--cyber-space-4);
+  line-height: 1.7;
+  color: var(--cyber-text-secondary);
+  font-family: var(--cyber-font-secondary);
 }
 
+/* Cyberpunk Links */
 a {
-  color: var(--primary-600);
+  color: var(--cyber-neon-blue);
   text-decoration: none;
+  position: relative;
+  transition: all var(--cyber-duration-fast) var(--cyber-ease-cyber);
+}
+
+a::before {
+  content: '';
+  position: absolute;
+  bottom: -2px;
+  left: 0;
+  width: 0;
+  height: 1px;
+  background: var(--cyber-neon-blue);
+  transition: width var(--cyber-duration-fast) var(--cyber-ease-cyber);
+  box-shadow: var(--cyber-glow-sm);
 }
 
 a:hover {
-  color: var(--primary-700);
-  text-decoration: underline;
+  color: var(--cyber-neon-pink);
+  text-shadow: var(--cyber-glow-sm);
+  text-decoration: none;
 }
 
-.dark a {
-  color: var(--primary-400);
+a:hover::before {
+  width: 100%;
+  background: var(--cyber-neon-pink);
+  box-shadow: var(--cyber-glow-pink);
 }
 
-.dark a:hover {
-  color: var(--primary-300);
+/* Cyberpunk code styling */
+code {
+  font-family: var(--cyber-font-primary);
+  background: rgba(0, 255, 255, 0.1);
+  color: var(--cyber-neon-green);
+  padding: var(--cyber-space-1) var(--cyber-space-2);
+  border-radius: var(--cyber-radius-base);
+  border: 1px solid rgba(57, 255, 20, 0.3);
+  text-shadow: var(--cyber-glow-sm);
+}
+
+pre {
+  background: var(--cyber-bg-card);
+  border: 1px solid var(--cyber-border-accent);
+  border-radius: var(--cyber-radius-lg);
+  padding: var(--cyber-space-4);
+  overflow-x: auto;
+  font-family: var(--cyber-font-primary);
+  color: var(--cyber-text-primary);
+  box-shadow: var(--cyber-glow-blue);
+}
+
+pre code {
+  background: none;
+  border: none;
+  padding: 0;
+  color: inherit;
 }
 
 /* Utility Classes */
@@ -2043,101 +2340,189 @@ a:hover {
 .shadow-lg { box-shadow: var(--shadow-lg); }
 .shadow-xl { box-shadow: var(--shadow-xl); }
 
-/* Component Styles */
+/* Cyberpunk Component Styles */
 .btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: var(--spacing-sm) var(--spacing-md);
-  font-weight: 500;
-  font-size: 0.875rem;
+  gap: var(--cyber-space-2);
+  padding: var(--cyber-space-3) var(--cyber-space-6);
+  font-family: var(--cyber-font-primary);
+  font-weight: var(--cyber-font-semibold);
+  font-size: var(--cyber-text-sm);
   line-height: 1.5;
-  border-radius: var(--radius-md);
-  border: 1px solid transparent;
+  border-radius: var(--cyber-radius-md);
+  border: 2px solid transparent;
   cursor: pointer;
-  transition: all 0.2s ease-in-out;
+  transition: all var(--cyber-duration-normal) var(--cyber-ease-cyber);
   text-decoration: none;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  position: relative;
+  overflow: hidden;
+}
+
+.btn::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: var(--cyber-scanlines);
+  opacity: 0;
+  transition: opacity var(--cyber-duration-normal) ease;
+}
+
+.btn:hover::before {
+  opacity: 1;
 }
 
 .btn:focus {
-  outline: 2px solid var(--primary-500);
+  outline: 2px solid var(--cyber-neon-blue);
   outline-offset: 2px;
+  box-shadow: var(--cyber-glow-blue);
 }
 
 .btn-primary {
-  background-color: var(--primary-600);
-  color: white;
+  background: var(--cyber-gradient-primary);
+  color: var(--cyber-text-primary);
+  border-color: var(--cyber-neon-pink);
+  box-shadow: var(--cyber-glow-pink);
 }
 
 .btn-primary:hover {
-  background-color: var(--primary-700);
-  color: white;
+  background: var(--cyber-gradient-primary);
+  color: var(--cyber-text-primary);
   text-decoration: none;
+  transform: translateY(-2px);
+  box-shadow: 
+    var(--cyber-glow-pink),
+    0 8px 25px -8px rgba(255, 0, 128, 0.4);
+  animation: cyber-glow-pulse var(--cyber-duration-slower) ease-in-out infinite;
 }
 
 .btn-secondary {
-  background-color: var(--slate-100);
-  color: var(--slate-700);
-  border-color: var(--slate-300);
+  background: transparent;
+  color: var(--cyber-neon-blue);
+  border-color: var(--cyber-neon-blue);
+  backdrop-filter: blur(10px);
 }
 
 .btn-secondary:hover {
-  background-color: var(--slate-200);
-  color: var(--slate-800);
+  background: rgba(0, 255, 255, 0.1);
+  color: var(--cyber-neon-blue);
   text-decoration: none;
+  box-shadow: var(--cyber-glow-blue);
+  border-color: var(--cyber-neon-blue);
 }
 
-.dark .btn-secondary {
-  background-color: var(--slate-700);
-  color: var(--slate-300);
-  border-color: var(--slate-600);
+.btn-ghost {
+  background: var(--cyber-btn-ghost-bg);
+  color: var(--cyber-btn-ghost-text);
+  border-color: transparent;
 }
 
-.dark .btn-secondary:hover {
-  background-color: var(--slate-600);
-  color: var(--slate-200);
+.btn-ghost:hover {
+  background: rgba(0, 255, 255, 0.2);
+  color: var(--cyber-neon-blue);
+  text-decoration: none;
+  text-shadow: var(--cyber-glow-sm);
 }
 
+/* Cyberpunk Cards */
 .card {
-  background-color: white;
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-sm);
-  border: 1px solid var(--slate-200);
+  background: var(--cyber-card-primary-bg);
+  backdrop-filter: blur(10px);
+  border-radius: var(--cyber-radius-xl);
+  border: 1px solid var(--cyber-card-primary-border);
+  box-shadow: 
+    var(--cyber-shadow-lg),
+    inset 0 1px 0 rgba(0, 255, 255, 0.1);
+  position: relative;
+  overflow: hidden;
+  transition: all var(--cyber-duration-normal) var(--cyber-ease-cyber);
 }
 
-.dark .card {
-  background-color: var(--slate-800);
-  border-color: var(--slate-700);
+.card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: var(--cyber-grid);
+  background-size: 20px 20px;
+  opacity: 0.05;
+  pointer-events: none;
 }
 
+.card:hover {
+  border-color: var(--cyber-neon-blue);
+  box-shadow: 
+    var(--cyber-glow-blue),
+    var(--cyber-shadow-xl);
+  transform: translateY(-4px);
+}
+
+.card-glow {
+  background: var(--cyber-gradient-card);
+  border-color: var(--cyber-neon-pink);
+  box-shadow: var(--cyber-glow-pink);
+}
+
+.card-accent {
+  background: var(--cyber-card-accent-bg);
+  border-color: var(--cyber-card-accent-border);
+  box-shadow: var(--cyber-glow-pink);
+}
+
+/* Cyberpunk Inputs */
 .input {
   display: block;
   width: 100%;
-  padding: var(--spacing-sm) var(--spacing-md);
-  font-size: 1rem;
+  padding: var(--cyber-space-3) var(--cyber-space-4);
+  font-family: var(--cyber-font-primary);
+  font-size: var(--cyber-text-base);
   line-height: 1.5;
-  color: var(--slate-900);
-  background-color: white;
-  border: 1px solid var(--slate-300);
-  border-radius: var(--radius-md);
-  transition: border-color 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+  color: var(--cyber-input-text);
+  background: var(--cyber-input-bg);
+  backdrop-filter: blur(10px);
+  border: 1px solid var(--cyber-input-border);
+  border-radius: var(--cyber-radius-md);
+  transition: all var(--cyber-duration-normal) var(--cyber-ease-cyber);
+  position: relative;
+}
+
+.input::placeholder {
+  color: var(--cyber-input-placeholder);
+  font-style: italic;
 }
 
 .input:focus {
   outline: none;
-  border-color: var(--primary-500);
-  box-shadow: 0 0 0 3px rgb(79 70 229 / 0.1);
+  border-color: var(--cyber-input-border-focus);
+  box-shadow: 
+    0 0 0 2px rgba(0, 255, 255, 0.2),
+    var(--cyber-glow-blue);
+  background: rgba(26, 26, 46, 0.9);
 }
 
-.dark .input {
-  background-color: var(--slate-800);
-  border-color: var(--slate-600);
-  color: var(--slate-100);
+.input:hover {
+  border-color: rgba(0, 255, 255, 0.5);
 }
 
-.dark .input:focus {
-  border-color: var(--primary-400);
-  box-shadow: 0 0 0 3px rgb(99 102 241 / 0.2);
+/* Cyberpunk Textarea */
+.textarea {
+  min-height: 120px;
+  resize: vertical;
+  font-family: var(--cyber-font-primary);
+}
+
+/* Cyberpunk Select */
+.select {
+  background-image: 
+    linear-gradient(45deg, transparent 50%, var(--cyber-neon-blue) 50%),
+    linear-gradient(135deg, var(--cyber-neon-blue) 50%, transparent 50%);
+  background-position: 
+    calc(100% - 20px) calc(1em + 2px),
+    calc(100% - 15px) calc(1em + 2px);
+  background-size: 5px 5px, 5px 5px;
+  background-repeat: no-repeat;
 }
 
 /* Responsive utilities */
@@ -2162,6 +2547,173 @@ a:hover {
   .lg\:grid-cols-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .lg\:grid-cols-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
   .lg\:px-8 { padding-left: var(--spacing-xl); padding-right: var(--spacing-xl); }
+}
+
+/* === CYBERPUNK VISUAL EFFECTS === */
+
+/* Matrix rain effect */
+.cyber-matrix-bg {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: -1;
+  opacity: 0.1;
+}
+
+.cyber-matrix-column {
+  position: absolute;
+  top: -100%;
+  font-family: var(--cyber-font-primary);
+  font-size: 12px;
+  color: var(--cyber-neon-green);
+  animation: cyber-matrix-rain 10s linear infinite;
+  text-shadow: var(--cyber-glow-green);
+}
+
+/* Glitch text effect */
+.cyber-glitch {
+  position: relative;
+  display: inline-block;
+}
+
+.cyber-glitch::before,
+.cyber-glitch::after {
+  content: attr(data-text);
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.cyber-glitch::before {
+  animation: cyber-glitch-1 var(--cyber-duration-slower) infinite;
+  color: var(--cyber-neon-blue);
+  z-index: -1;
+}
+
+.cyber-glitch::after {
+  animation: cyber-glitch-2 var(--cyber-duration-slower) infinite;
+  color: var(--cyber-neon-pink);
+  z-index: -2;
+}
+
+@keyframes cyber-glitch-1 {
+  0%, 14%, 15%, 49%, 50%, 99%, 100% {
+    transform: translate(0);
+  }
+  15% {
+    transform: translate(-2px, 2px);
+  }
+  50% {
+    transform: translate(2px, -2px);
+  }
+}
+
+@keyframes cyber-glitch-2 {
+  0%, 20%, 21%, 62%, 63%, 99%, 100% {
+    transform: translate(0);
+  }
+  21% {
+    transform: translate(2px, -2px);
+  }
+  63% {
+    transform: translate(-2px, 2px);
+  }
+}
+
+/* Terminal cursor effect */
+.cyber-terminal-cursor::after {
+  content: '_';
+  animation: cyber-cursor-blink 1s infinite;
+  color: var(--cyber-neon-green);
+  margin-left: 2px;
+}
+
+/* Holographic effect */
+.cyber-hologram {
+  position: relative;
+  background: linear-gradient(45deg, transparent 30%, rgba(0, 255, 255, 0.1) 50%, transparent 70%);
+  background-size: 20px 20px;
+  animation: cyber-hologram-sweep 3s linear infinite;
+}
+
+@keyframes cyber-hologram-sweep {
+  0% {
+    background-position: -20px 0;
+  }
+  100% {
+    background-position: 100% 0;
+  }
+}
+
+/* Circuit board pattern */
+.cyber-circuit {
+  background: 
+    radial-gradient(circle at 25% 25%, var(--cyber-neon-blue) 1px, transparent 1px),
+    radial-gradient(circle at 75% 75%, var(--cyber-neon-pink) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0, 255, 255, 0.1) 50%, transparent 50%),
+    linear-gradient(rgba(255, 0, 128, 0.1) 50%, transparent 50%);
+  background-size: 40px 40px, 40px 40px, 20px 20px, 20px 20px;
+  background-position: 0 0, 20px 20px, 0 0, 10px 10px;
+}
+
+/* Neon border effect */
+.cyber-neon-border {
+  position: relative;
+  border: 2px solid var(--cyber-neon-blue);
+  box-shadow: 
+    inset 0 0 20px rgba(0, 255, 255, 0.2),
+    0 0 20px rgba(0, 255, 255, 0.3);
+}
+
+.cyber-neon-border::before {
+  content: '';
+  position: absolute;
+  inset: -2px;
+  background: linear-gradient(45deg, var(--cyber-neon-blue), var(--cyber-neon-pink), var(--cyber-neon-green), var(--cyber-neon-blue));
+  border-radius: inherit;
+  padding: 2px;
+  mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  mask-composite: exclude;
+  animation: cyber-border-rotate 4s linear infinite;
+}
+
+@keyframes cyber-border-rotate {
+  0% {
+    filter: hue-rotate(0deg);
+  }
+  100% {
+    filter: hue-rotate(360deg);
+  }
+}
+
+/* Data stream effect */
+.cyber-data-stream {
+  position: relative;
+  overflow: hidden;
+}
+
+.cyber-data-stream::before {
+  content: '010010110110111010101101101110001011110010110111101010110110011010110';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  font-family: var(--cyber-font-primary);
+  font-size: 10px;
+  color: var(--cyber-neon-green);
+  opacity: 0.3;
+  white-space: nowrap;
+  animation: cyber-data-flow 8s linear infinite;
+}
+
+@keyframes cyber-data-flow {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100vw);
+  }
 }
 
 /* Animation utilities */
@@ -2291,6 +2843,163 @@ a:hover {
 .btn-link:hover { color: var(--primary-700); text-decoration: underline; }
 .dark .btn-link { color: var(--primary-400); }
 .dark .btn-link:hover { color: var(--primary-300); }
+
+/* === CYBERPUNK UTILITY CLASSES === */
+
+/* Cyberpunk Text Effects */
+.cyber-text-glow { text-shadow: var(--cyber-glow-md); }
+.cyber-text-neon-blue { color: var(--cyber-neon-blue); text-shadow: var(--cyber-glow-blue); }
+.cyber-text-neon-pink { color: var(--cyber-neon-pink); text-shadow: var(--cyber-glow-pink); }
+.cyber-text-neon-green { color: var(--cyber-neon-green); text-shadow: var(--cyber-glow-green); }
+.cyber-text-neon-purple { color: var(--cyber-neon-purple); text-shadow: var(--cyber-glow-purple); }
+
+/* Cyberpunk Background Effects */
+.cyber-bg-primary { background: var(--cyber-bg-primary); }
+.cyber-bg-secondary { background: var(--cyber-bg-secondary); }
+.cyber-bg-card { background: var(--cyber-bg-card); }
+.cyber-bg-gradient { background: var(--cyber-gradient-primary); }
+.cyber-bg-gradient-card { background: var(--cyber-gradient-card); }
+
+/* Cyberpunk Border Effects */
+.cyber-border { border: 1px solid var(--cyber-border-accent); }
+.cyber-border-glow { border: 1px solid var(--cyber-border-accent); box-shadow: var(--cyber-glow-blue); }
+
+/* Cyberpunk Button Variants */
+.cyber-btn-neon {
+  background: transparent;
+  border: 2px solid var(--cyber-neon-blue);
+  color: var(--cyber-neon-blue);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  transition: all var(--cyber-duration-normal) var(--cyber-ease-cyber);
+}
+
+.cyber-btn-neon:hover {
+  background: rgba(0, 255, 255, 0.1);
+  box-shadow: var(--cyber-glow-blue);
+  text-shadow: var(--cyber-glow-sm);
+  transform: translateY(-2px);
+}
+
+.cyber-btn-hack {
+  background: var(--cyber-gradient-primary);
+  border: none;
+  color: var(--cyber-text-primary);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  position: relative;
+  overflow: hidden;
+}
+
+.cyber-btn-hack::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: var(--cyber-scanlines);
+  opacity: 0;
+  transition: opacity var(--cyber-duration-normal) ease;
+}
+
+.cyber-btn-hack:hover::before {
+  opacity: 1;
+}
+
+.cyber-btn-hack:hover {
+  animation: cyber-glow-pulse var(--cyber-duration-slower) ease-in-out infinite;
+}
+
+/* Cyberpunk Card Variants */
+.cyber-card-neon {
+  background: var(--cyber-bg-card);
+  border: 1px solid var(--cyber-neon-blue);
+  border-radius: var(--cyber-radius-lg);
+  box-shadow: var(--cyber-glow-blue);
+  backdrop-filter: blur(10px);
+  position: relative;
+  overflow: hidden;
+}
+
+.cyber-card-hack {
+  background: var(--cyber-gradient-card);
+  border: 1px solid var(--cyber-neon-pink);
+  border-radius: var(--cyber-radius-lg);
+  box-shadow: var(--cyber-glow-pink);
+  position: relative;
+}
+
+.cyber-card-hack::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: var(--cyber-circuit);
+  opacity: 0.1;
+  pointer-events: none;
+}
+
+/* Cyberpunk Input Variants */
+.cyber-input-neon {
+  background: rgba(26, 26, 46, 0.8);
+  border: 1px solid var(--cyber-neon-blue);
+  color: var(--cyber-text-primary);
+  font-family: var(--cyber-font-primary);
+  backdrop-filter: blur(10px);
+}
+
+.cyber-input-neon:focus {
+  border-color: var(--cyber-neon-pink);
+  box-shadow: var(--cyber-glow-pink);
+  background: rgba(26, 26, 46, 0.9);
+}
+
+.cyber-input-neon::placeholder {
+  color: var(--cyber-text-muted);
+  font-style: italic;
+}
+
+/* Cyberpunk Animation Classes */
+.cyber-pulse { animation: cyber-pulse var(--cyber-duration-slower) ease-in-out infinite; }
+.cyber-glow-anim { animation: cyber-glow-pulse var(--cyber-duration-slower) ease-in-out infinite; }
+.cyber-flicker { animation: cyber-flicker var(--cyber-duration-fast) ease-in-out infinite; }
+.cyber-glitch-anim { animation: cyber-glitch var(--cyber-duration-fast) linear infinite; }
+
+/* Cyberpunk Layout */
+.cyber-container {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 0 var(--cyber-space-4);
+}
+
+.cyber-grid {
+  display: grid;
+  gap: var(--cyber-space-6);
+}
+
+.cyber-flex {
+  display: flex;
+  gap: var(--cyber-space-4);
+}
+
+/* Cyberpunk Spacing */
+.cyber-p-4 { padding: var(--cyber-space-4); }
+.cyber-p-6 { padding: var(--cyber-space-6); }
+.cyber-p-8 { padding: var(--cyber-space-8); }
+.cyber-m-4 { margin: var(--cyber-space-4); }
+.cyber-m-6 { margin: var(--cyber-space-6); }
+.cyber-m-8 { margin: var(--cyber-space-8); }
+
+/* Cyberpunk Typography Classes */
+.cyber-font-mono { font-family: var(--cyber-font-primary); }
+.cyber-font-sans { font-family: var(--cyber-font-secondary); }
+.cyber-font-accent { font-family: var(--cyber-font-accent); }
+
+.cyber-text-xs { font-size: var(--cyber-text-xs); }
+.cyber-text-sm { font-size: var(--cyber-text-sm); }
+.cyber-text-base { font-size: var(--cyber-text-base); }
+.cyber-text-lg { font-size: var(--cyber-text-lg); }
+.cyber-text-xl { font-size: var(--cyber-text-xl); }
+.cyber-text-2xl { font-size: var(--cyber-text-2xl); }
+.cyber-text-3xl { font-size: var(--cyber-text-3xl); }
+.cyber-text-4xl { font-size: var(--cyber-text-4xl); }
 
 /* --- Appended: additional utilities and Skills semantic sections --- */
 /* Grid column span at lg breakpoint (3) */

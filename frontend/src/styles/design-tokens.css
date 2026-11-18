@@ -1,0 +1,599 @@
+/* ================================
+   MODERN DESIGN SYSTEM TOKENS
+   ================================ */
+
+:root {
+  /* === CORE DESIGN TOKENS === */
+  
+  /* Color System RGB Values (for rgba usage) */
+  --color-primary-rgb: 99, 102, 241;
+  --color-secondary-rgb: 16, 185, 129;
+  --color-danger-rgb: 239, 68, 68;
+  --color-warning-rgb: 245, 158, 11;
+  --color-success-rgb: 34, 197, 94;
+  --color-info-rgb: 59, 130, 246;
+  --color-focus-rgb: 99, 102, 241;
+  
+  /* Core Brand Colors */
+  --color-primary: rgb(var(--color-primary-rgb));
+  --color-primary-50: #eef2ff;
+  --color-primary-100: #e0e7ff;
+  --color-primary-200: #c7d2fe;
+  --color-primary-300: #a5b4fc;
+  --color-primary-400: #818cf8;
+  --color-primary-500: #6366f1;
+  --color-primary-600: #4f46e5;
+  --color-primary-700: #4338ca;
+  --color-primary-800: #3730a3;
+  --color-primary-900: #312e81;
+  --color-primary-hover: var(--color-primary-700);
+  --color-primary-focus: var(--color-primary-600);
+  --color-primary-light: var(--color-primary-100);
+  --color-primary-foreground: #ffffff;
+  
+  /* Secondary Colors */
+  --color-secondary: rgb(var(--color-secondary-rgb));
+  --color-secondary-50: #ecfdf5;
+  --color-secondary-100: #d1fae5;
+  --color-secondary-200: #a7f3d0;
+  --color-secondary-300: #6ee7b7;
+  --color-secondary-400: #34d399;
+  --color-secondary-500: #10b981;
+  --color-secondary-600: #059669;
+  --color-secondary-700: #047857;
+  --color-secondary-800: #065f46;
+  --color-secondary-900: #064e3b;
+  --color-secondary-hover: var(--color-secondary-700);
+  --color-secondary-foreground: #ffffff;
+  
+  /* Semantic Colors */
+  --color-success: rgb(var(--color-success-rgb));
+  --color-success-light: #f0fdf4;
+  --color-success-foreground: #ffffff;
+  
+  --color-danger: rgb(var(--color-danger-rgb));
+  --color-danger-light: #fef2f2;
+  --color-danger-hover: #dc2626;
+  --color-danger-foreground: #ffffff;
+  
+  --color-warning: rgb(var(--color-warning-rgb));
+  --color-warning-light: #fffbeb;
+  --color-warning-foreground: #ffffff;
+  
+  --color-info: rgb(var(--color-info-rgb));
+  --color-info-light: #eff6ff;
+  --color-info-foreground: #ffffff;
+  
+  /* Neutral Colors */
+  --color-slate-50: #f8fafc;
+  --color-slate-100: #f1f5f9;
+  --color-slate-200: #e2e8f0;
+  --color-slate-300: #cbd5e1;
+  --color-slate-400: #94a3b8;
+  --color-slate-500: #64748b;
+  --color-slate-600: #475569;
+  --color-slate-700: #334155;
+  --color-slate-800: #1e293b;
+  --color-slate-900: #0f172a;
+  
+  /* Surface Colors */
+  --color-bg-primary: #ffffff;
+  --color-bg-secondary: var(--color-slate-50);
+  --color-card: #ffffff;
+  --color-input: #ffffff;
+  --color-muted: var(--color-slate-100);
+  --color-border: var(--color-slate-200);
+  --color-focus: var(--color-primary);
+  
+  /* Text Colors */
+  --color-text-primary: var(--color-slate-900);
+  --color-text-secondary: var(--color-slate-700);
+  --color-text-muted: var(--color-slate-500);
+  --color-text-heading: var(--color-slate-900);
+  
+  /* Typography Scale */
+  --font-family-primary: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-family-secondary: 'Inter', system-ui, sans-serif;
+  --font-family-heading: 'Inter', system-ui, sans-serif;
+  --font-family-mono: 'JetBrains Mono', 'Fira Code', 'Monaco', 'Consolas', monospace;
+  
+  --font-size-xs: 0.75rem;      /* 12px */
+  --font-size-sm: 0.875rem;     /* 14px */
+  --font-size-base: 1rem;       /* 16px */
+  --font-size-lg: 1.125rem;     /* 18px */
+  --font-size-xl: 1.25rem;      /* 20px */
+  --font-size-2xl: 1.5rem;      /* 24px */
+  --font-size-3xl: 1.875rem;    /* 30px */
+  --font-size-4xl: 2.25rem;     /* 36px */
+  --font-size-5xl: 3rem;        /* 48px */
+  --font-size-6xl: 3.75rem;     /* 60px */
+  
+  --font-weight-light: 300;
+  --font-weight-normal: 400;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
+  --font-weight-bold: 700;
+  --font-weight-black: 900;
+  
+  --line-height-tight: 1.2;
+  --line-height-normal: 1.5;
+  --line-height-relaxed: 1.6;
+  --line-height-loose: 1.8;
+  --line-height-base: var(--line-height-normal);
+  
+  /* Spacing Scale */
+  --space-0: 0;
+  --space-0-5: 0.125rem;        /* 2px */
+  --space-1: 0.25rem;           /* 4px */
+  --space-1-5: 0.375rem;        /* 6px */
+  --space-2: 0.5rem;            /* 8px */
+  --space-3: 0.75rem;           /* 12px */
+  --space-4: 1rem;              /* 16px */
+  --space-5: 1.25rem;           /* 20px */
+  --space-6: 1.5rem;            /* 24px */
+  --space-8: 2rem;              /* 32px */
+  --space-10: 2.5rem;           /* 40px */
+  --space-12: 3rem;             /* 48px */
+  --space-16: 4rem;             /* 64px */
+  --space-20: 5rem;             /* 80px */
+  --space-24: 6rem;             /* 96px */
+  
+  /* Border Radius */
+  --border-radius-none: 0;
+  --border-radius-sm: 0.125rem; /* 2px */
+  --border-radius-base: 0.25rem; /* 4px */
+  --border-radius-md: 0.375rem; /* 6px */
+  --border-radius-lg: 0.5rem;   /* 8px */
+  --border-radius-xl: 0.75rem;  /* 12px */
+  --border-radius-2xl: 1rem;    /* 16px */
+  --border-radius-full: 9999px;
+  
+  /* Shadows */
+  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+  --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
+  --shadow-2xl: 0 25px 50px -12px rgb(0 0 0 / 0.25);
+  
+  /* Transitions */
+  --duration-instant: 0.1s;
+  --duration-fast: 0.2s;
+  --duration-normal: 0.3s;
+  --duration-slow: 0.5s;
+  --duration-slower: 0.8s;
+  --duration-slowest: 1.2s;
+  
+  --ease-linear: linear;
+  --ease-in: cubic-bezier(0.4, 0, 1, 1);
+  --ease-out: cubic-bezier(0, 0, 0.2, 1);
+  --ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-out-cubic: cubic-bezier(0.215, 0.61, 0.355, 1);
+  
+  /* Layout */
+  --container-max-width: 1280px;
+  --container-narrow: 768px;
+  --container-wide: 1536px;
+  --container-padding: var(--space-4);
+  
+  --section-spacing: var(--space-16);
+  --section-spacing-small: var(--space-12);
+  --section-spacing-large: var(--space-24);
+  
+  /* Z-Index Scale */
+  --z-base: 0;
+  --z-docked: 10;
+  --z-dropdown: 20;
+  --z-sticky: 30;
+  --z-banner: 40;
+  --z-overlay: 50;
+  --z-modal: 60;
+  --z-popover: 70;
+  --z-tooltip: 80;
+  --z-toast: 90;
+  --z-max: 100;
+  
+  /* === CYBERPUNK THEME OVERRIDES === */
+  /* Cyberpunk Color Palette (when cyber theme is active) */
+  
+  /* Primary Neon Colors */
+  --cyber-neon-pink: #ff0080;
+  --cyber-neon-blue: #00ffff;
+  --cyber-neon-green: #39ff14;
+  --cyber-neon-purple: #8a2be2;
+  --cyber-neon-orange: #ff4500;
+  --cyber-neon-yellow: #ffff00;
+  
+  /* Background Colors */
+  --cyber-bg-primary: #0a0a0a;
+  --cyber-bg-secondary: #1a1a2e;
+  --cyber-bg-tertiary: #16213e;
+  --cyber-bg-overlay: #0f1419;
+  --cyber-bg-card: #0d1117;
+  --cyber-bg-navbar: rgba(10, 10, 10, 0.95);
+  
+  /* Text Colors */
+  --cyber-text-primary: #ffffff;
+  --cyber-text-secondary: #e2e8f0;
+  --cyber-text-muted: #64748b;
+  --cyber-text-accent: var(--cyber-neon-blue);
+  --cyber-text-warning: var(--cyber-neon-orange);
+  --cyber-text-success: var(--cyber-neon-green);
+  --cyber-text-error: var(--cyber-neon-pink);
+  
+  /* Border Colors */
+  --cyber-border-primary: #333333;
+  --cyber-border-accent: var(--cyber-neon-blue);
+  --cyber-border-glow: rgba(0, 255, 255, 0.3);
+  
+  /* Gradient Combinations */
+  --cyber-gradient-primary: linear-gradient(135deg, var(--cyber-neon-pink), var(--cyber-neon-purple));
+  --cyber-gradient-secondary: linear-gradient(135deg, var(--cyber-neon-blue), var(--cyber-neon-green));
+  --cyber-gradient-background: linear-gradient(135deg, var(--cyber-bg-primary), var(--cyber-bg-secondary));
+  --cyber-gradient-card: linear-gradient(135deg, rgba(255, 0, 128, 0.1), rgba(138, 43, 226, 0.1));
+  --cyber-gradient-button: linear-gradient(135deg, var(--cyber-neon-blue), var(--cyber-neon-purple));
+  
+  /* === CYBERPUNK TYPOGRAPHY === */
+  
+  /* Font Families */
+  --cyber-font-primary: 'JetBrains Mono', 'Fira Code', 'Monaco', 'Consolas', monospace;
+  --cyber-font-secondary: 'Inter', 'Roboto', system-ui, sans-serif;
+  --cyber-font-accent: 'Orbitron', 'Exo 2', 'Rajdhani', sans-serif;
+  
+  /* Font Sizes */
+  --cyber-text-xs: 0.75rem;      /* 12px */
+  --cyber-text-sm: 0.875rem;     /* 14px */
+  --cyber-text-base: 1rem;       /* 16px */
+  --cyber-text-lg: 1.125rem;     /* 18px */
+  --cyber-text-xl: 1.25rem;      /* 20px */
+  --cyber-text-2xl: 1.5rem;      /* 24px */
+  --cyber-text-3xl: 1.875rem;    /* 30px */
+  --cyber-text-4xl: 2.25rem;     /* 36px */
+  --cyber-text-5xl: 3rem;        /* 48px */
+  --cyber-text-6xl: 3.75rem;     /* 60px */
+  
+  /* Font Weights */
+  --cyber-font-light: 300;
+  --cyber-font-normal: 400;
+  --cyber-font-medium: 500;
+  --cyber-font-semibold: 600;
+  --cyber-font-bold: 700;
+  --cyber-font-black: 900;
+  
+  /* === CYBERPUNK SPACING === */
+  
+  --cyber-space-1: 0.25rem;      /* 4px */
+  --cyber-space-2: 0.5rem;       /* 8px */
+  --cyber-space-3: 0.75rem;      /* 12px */
+  --cyber-space-4: 1rem;         /* 16px */
+  --cyber-space-5: 1.25rem;      /* 20px */
+  --cyber-space-6: 1.5rem;       /* 24px */
+  --cyber-space-8: 2rem;         /* 32px */
+  --cyber-space-10: 2.5rem;      /* 40px */
+  --cyber-space-12: 3rem;        /* 48px */
+  --cyber-space-16: 4rem;        /* 64px */
+  --cyber-space-20: 5rem;        /* 80px */
+  --cyber-space-24: 6rem;        /* 96px */
+  
+  /* === CYBERPUNK BORDER RADIUS === */
+  
+  --cyber-radius-none: 0;
+  --cyber-radius-sm: 0.125rem;    /* 2px */
+  --cyber-radius-base: 0.25rem;   /* 4px */
+  --cyber-radius-md: 0.375rem;    /* 6px */
+  --cyber-radius-lg: 0.5rem;      /* 8px */
+  --cyber-radius-xl: 0.75rem;     /* 12px */
+  --cyber-radius-2xl: 1rem;       /* 16px */
+  --cyber-radius-3xl: 1.5rem;     /* 24px */
+  --cyber-radius-full: 9999px;
+  
+  /* === CYBERPUNK SHADOWS & GLOWS === */
+  
+  /* Neon Glows */
+  --cyber-glow-sm: 0 0 5px currentColor;
+  --cyber-glow-md: 0 0 10px currentColor, 0 0 20px currentColor;
+  --cyber-glow-lg: 0 0 15px currentColor, 0 0 30px currentColor, 0 0 45px currentColor;
+  --cyber-glow-xl: 0 0 20px currentColor, 0 0 40px currentColor, 0 0 60px currentColor, 0 0 80px currentColor;
+  
+  /* Colored Glows */
+  --cyber-glow-pink: 0 0 10px var(--cyber-neon-pink), 0 0 20px var(--cyber-neon-pink), 0 0 30px var(--cyber-neon-pink);
+  --cyber-glow-blue: 0 0 10px var(--cyber-neon-blue), 0 0 20px var(--cyber-neon-blue), 0 0 30px var(--cyber-neon-blue);
+  --cyber-glow-green: 0 0 10px var(--cyber-neon-green), 0 0 20px var(--cyber-neon-green), 0 0 30px var(--cyber-neon-green);
+  --cyber-glow-purple: 0 0 10px var(--cyber-neon-purple), 0 0 20px var(--cyber-neon-purple), 0 0 30px var(--cyber-neon-purple);
+  
+  /* Traditional Shadows */
+  --cyber-shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.5);
+  --cyber-shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.3), 0 2px 4px -1px rgba(0, 0, 0, 0.2);
+  --cyber-shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.3), 0 4px 6px -2px rgba(0, 0, 0, 0.2);
+  --cyber-shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.3), 0 10px 10px -5px rgba(0, 0, 0, 0.2);
+  
+  /* === CYBERPUNK ANIMATIONS === */
+  
+  /* Animation Durations */
+  --cyber-duration-fast: 0.15s;
+  --cyber-duration-normal: 0.3s;
+  --cyber-duration-slow: 0.5s;
+  --cyber-duration-slower: 1s;
+  
+  /* Animation Easings */
+  --cyber-ease-in: cubic-bezier(0.4, 0, 1, 1);
+  --cyber-ease-out: cubic-bezier(0, 0, 0.2, 1);
+  --cyber-ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
+  --cyber-ease-cyber: cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  
+  /* === CYBERPUNK Z-INDEX === */
+  
+  --cyber-z-base: 0;
+  --cyber-z-dropdown: 10;
+  --cyber-z-overlay: 20;
+  --cyber-z-modal: 30;
+  --cyber-z-popover: 40;
+  --cyber-z-tooltip: 50;
+  --cyber-z-navbar: 100;
+  --cyber-z-max: 9999;
+  
+  /* === CYBERPUNK EFFECTS === */
+  
+  /* Scan Lines */
+  --cyber-scanlines: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    rgba(0, 255, 255, 0.03) 2px,
+    rgba(0, 255, 255, 0.03) 4px
+  );
+  
+  /* Grid Pattern */
+  --cyber-grid: 
+    linear-gradient(rgba(0, 255, 255, 0.1) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0, 255, 255, 0.1) 1px, transparent 1px);
+  
+  /* Noise Texture */
+  --cyber-noise: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='1' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.1'/%3E%3C/svg%3E");
+  
+  /* === CYBERPUNK COMPONENT VARIATIONS === */
+  
+  /* Button Variants */
+  --cyber-btn-primary-bg: var(--cyber-gradient-primary);
+  --cyber-btn-primary-border: var(--cyber-neon-pink);
+  --cyber-btn-primary-text: var(--cyber-text-primary);
+  
+  --cyber-btn-secondary-bg: transparent;
+  --cyber-btn-secondary-border: var(--cyber-neon-blue);
+  --cyber-btn-secondary-text: var(--cyber-neon-blue);
+  
+  --cyber-btn-ghost-bg: rgba(0, 255, 255, 0.1);
+  --cyber-btn-ghost-border: transparent;
+  --cyber-btn-ghost-text: var(--cyber-neon-blue);
+  
+  /* Card Variants */
+  --cyber-card-primary-bg: rgba(13, 17, 23, 0.8);
+  --cyber-card-primary-border: rgba(0, 255, 255, 0.2);
+  
+  --cyber-card-accent-bg: var(--cyber-gradient-card);
+  --cyber-card-accent-border: var(--cyber-neon-pink);
+  
+  /* Input Variants */
+  --cyber-input-bg: rgba(26, 26, 46, 0.8);
+  --cyber-input-border: rgba(100, 116, 139, 0.3);
+  --cyber-input-border-focus: var(--cyber-neon-blue);
+  --cyber-input-text: var(--cyber-text-primary);
+  --cyber-input-placeholder: var(--cyber-text-muted);
+}
+
+/* === CYBERPUNK DARK MODE OVERRIDES === */
+.cyber-theme {
+  /* Ensure cyberpunk theme takes precedence */
+  --primary-50: var(--cyber-bg-primary);
+  --primary-100: var(--cyber-bg-secondary);
+  --primary-200: var(--cyber-bg-tertiary);
+  --primary-300: rgba(0, 255, 255, 0.3);
+  --primary-400: rgba(0, 255, 255, 0.6);
+  --primary-500: var(--cyber-neon-blue);
+  --primary-600: var(--cyber-neon-blue);
+  --primary-700: var(--cyber-neon-blue);
+  --primary-800: var(--cyber-neon-blue);
+  --primary-900: var(--cyber-neon-blue);
+  
+  --accent-50: rgba(255, 0, 128, 0.1);
+  --accent-100: rgba(255, 0, 128, 0.2);
+  --accent-200: rgba(255, 0, 128, 0.3);
+  --accent-300: rgba(255, 0, 128, 0.4);
+  --accent-400: rgba(255, 0, 128, 0.6);
+  --accent-500: var(--cyber-neon-pink);
+  --accent-600: var(--cyber-neon-pink);
+  --accent-700: var(--cyber-neon-pink);
+  --accent-800: var(--cyber-neon-pink);
+  --accent-900: var(--cyber-neon-pink);
+  
+  /* Override slate colors */
+  --slate-50: var(--cyber-text-primary);
+  --slate-100: var(--cyber-text-secondary);
+  --slate-200: rgba(226, 232, 240, 0.3);
+  --slate-300: rgba(100, 116, 139, 0.5);
+  --slate-400: var(--cyber-text-muted);
+  --slate-500: var(--cyber-text-muted);
+  --slate-600: rgba(100, 116, 139, 0.3);
+  --slate-700: var(--cyber-border-primary);
+  --slate-800: var(--cyber-bg-card);
+  --slate-900: var(--cyber-bg-primary);
+}
+
+/* === CYBERPUNK KEYFRAMES === */
+
+@keyframes cyber-pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.7;
+  }
+}
+
+@keyframes cyber-glow-pulse {
+  0%, 100% {
+    text-shadow: var(--cyber-glow-sm);
+  }
+  50% {
+    text-shadow: var(--cyber-glow-lg);
+  }
+}
+
+@keyframes cyber-flicker {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.8;
+  }
+  75% {
+    opacity: 0.9;
+  }
+}
+
+@keyframes cyber-scan {
+  0% {
+    transform: translateY(-100%);
+  }
+  100% {
+    transform: translateY(100vh);
+  }
+}
+
+@keyframes cyber-glitch {
+  0% {
+    transform: translate(0);
+  }
+  10% {
+    transform: translate(-2px, 2px);
+  }
+  20% {
+    transform: translate(-2px, -2px);
+  }
+  30% {
+    transform: translate(2px, 2px);
+  }
+  40% {
+    transform: translate(2px, -2px);
+  }
+  50% {
+    transform: translate(-2px, 2px);
+  }
+  60% {
+    transform: translate(-2px, -2px);
+  }
+  70% {
+    transform: translate(2px, 2px);
+  }
+  80% {
+    transform: translate(-2px, -2px);
+  }
+  90% {
+    transform: translate(2px, 2px);
+  }
+  100% {
+    transform: translate(0);
+  }
+}
+
+@keyframes cyber-matrix-rain {
+  0% {
+    transform: translateY(-100%);
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(100vh);
+    opacity: 0;
+  }
+}
+
+@keyframes cyber-typing {
+  from {
+    width: 0;
+  }
+  to {
+    width: 100%;
+  }
+}
+
+@keyframes cyber-cursor-blink {
+  0%, 50% {
+    opacity: 1;
+  }
+  51%, 100% {
+    opacity: 0;
+  }
+}
+
+/* === CYBERPUNK UTILITY CLASSES === */
+
+.cyber-glow {
+  text-shadow: var(--cyber-glow-md);
+}
+
+.cyber-glow-pink {
+  color: var(--cyber-neon-pink);
+  text-shadow: var(--cyber-glow-pink);
+}
+
+.cyber-glow-blue {
+  color: var(--cyber-neon-blue);
+  text-shadow: var(--cyber-glow-blue);
+}
+
+.cyber-glow-green {
+  color: var(--cyber-neon-green);
+  text-shadow: var(--cyber-glow-green);
+}
+
+.cyber-glow-purple {
+  color: var(--cyber-neon-purple);
+  text-shadow: var(--cyber-glow-purple);
+}
+
+.cyber-animate-pulse {
+  animation: cyber-pulse var(--cyber-duration-slower) ease-in-out infinite;
+}
+
+.cyber-animate-glow {
+  animation: cyber-glow-pulse var(--cyber-duration-slower) ease-in-out infinite;
+}
+
+.cyber-animate-flicker {
+  animation: cyber-flicker var(--cyber-duration-fast) ease-in-out infinite;
+}
+
+.cyber-animate-glitch {
+  animation: cyber-glitch var(--cyber-duration-fast) linear infinite;
+}
+
+.cyber-scanlines {
+  position: relative;
+}
+
+.cyber-scanlines::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: var(--cyber-scanlines);
+  pointer-events: none;
+  z-index: 1;
+}
+
+.cyber-grid {
+  background-image: var(--cyber-grid);
+  background-size: 20px 20px;
+}
+
+.cyber-noise {
+  position: relative;
+}
+
+.cyber-noise::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: var(--cyber-noise);
+  pointer-events: none;
+  z-index: 1;
+  opacity: 0.1;
+}

@@ -1,10 +1,11 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 
 const ThemeContext = createContext({
-  theme: 'light',
+  theme: 'cyberpunk',
   toggleTheme: () => {},
   setTheme: () => {},
-  systemPreference: 'light'
+  systemPreference: 'light',
+  isCyberpunk: true
 });
 
 export const useTheme = () => {
@@ -19,12 +20,12 @@ export const ThemeProvider = ({ children }) => {
   const [theme, setThemeState] = useState(() => {
     // Check localStorage first
     const stored = localStorage.getItem('theme');
-    if (stored && (stored === 'light' || stored === 'dark')) {
+    if (stored && (stored === 'light' || stored === 'dark' || stored === 'cyberpunk')) {
       return stored;
     }
     
-    // Fall back to system preference
-    return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+    // Default to cyberpunk for the new theme
+    return 'cyberpunk';
   });
 
   const [systemPreference, setSystemPreference] = useState(() => 
@@ -46,11 +47,17 @@ export const ThemeProvider = ({ children }) => {
   // Apply theme to document
   useEffect(() => {
     const root = document.documentElement;
+    const body = document.body;
+    
+    // Remove all theme classes
+    root.classList.remove('dark', 'cyber-theme');
+    body.classList.remove('cyber-theme');
     
     if (theme === 'dark') {
       root.classList.add('dark');
-    } else {
-      root.classList.remove('dark');
+    } else if (theme === 'cyberpunk') {
+      root.classList.add('dark', 'cyber-theme');
+      body.classList.add('cyber-theme');
     }
 
     // Store in localStorage
@@ -59,25 +66,42 @@ export const ThemeProvider = ({ children }) => {
     // Update meta theme-color for mobile browsers
     const metaThemeColor = document.querySelector('meta[name="theme-color"]');
     if (metaThemeColor) {
-      metaThemeColor.setAttribute('content', theme === 'dark' ? '#0f172a' : '#ffffff');
+      const themeColors = {
+        light: '#ffffff',
+        dark: '#0f172a',
+        cyberpunk: '#0a0a0a'
+      };
+      metaThemeColor.setAttribute('content', themeColors[theme] || themeColors.cyberpunk);
     }
   }, [theme]);
 
   const setTheme = (newTheme) => {
-    if (newTheme === 'light' || newTheme === 'dark') {
+    if (newTheme === 'light' || newTheme === 'dark' || newTheme === 'cyberpunk') {
       setThemeState(newTheme);
     }
   };
 
   const toggleTheme = () => {
-    setThemeState(current => current === 'light' ? 'dark' : 'light');
+    setThemeState(current => {
+      switch (current) {
+        case 'light':
+          return 'dark';
+        case 'dark':
+          return 'cyberpunk';
+        case 'cyberpunk':
+          return 'light';
+        default:
+          return 'cyberpunk';
+      }
+    });
   };
 
   const value = {
     theme,
     toggleTheme,
     setTheme,
-    systemPreference
+    systemPreference,
+    isCyberpunk: theme === 'cyberpunk'
   };
 
   return (

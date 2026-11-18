@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { useTheme } from '../contexts/ThemeContext';
 import SkipNav from '../components/SkipNav';
 import HeroSection from '../components/HeroSection';
 import FeatureCards from '../components/FeatureCards';
 import Card from '../components/Card';
+import CyberpunkDemo from '../components/CyberpunkDemo';
 import { 
   ArrowRight,
   Star,
@@ -61,6 +63,7 @@ const testimonials = [
 
 const Home = () => {
   const { isAuthenticated } = useAuth();
+  const { isCyberpunk } = useTheme();
   const [isVisible, setIsVisible] = useState(false);
 
   useEffect(() => {
@@ -71,6 +74,9 @@ const Home = () => {
     <>
       <SkipNav />
       <main id="main-content" className="min-h-screen">
+        {/* Cyberpunk Demo Section */}
+        {isCyberpunk && <CyberpunkDemo />}
+        
         {/* Premium Hero Section */}
         <HeroSection />
         
