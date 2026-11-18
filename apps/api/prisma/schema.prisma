@@ -1,8 +1,5 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+// DevHub+ data model. See docs/ARCHITECTURE.md ("Data model") for the reasoning behind
+// denormalised counters, the reputation ledger and the index choices.
 
 generator client {
   provider = "prisma-client-js"
@@ -13,146 +10,368 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model User {
-  id                    Int                   @id @default(autoincrement())
-  username              String                @unique
-  email                 String                @unique
-  passwordHash          String
-  reputation            Int                   @default(0)
-  bio                   String?
-  createdAt             DateTime              @default(now())
-  questions             Question[]
-  answers               Answer[]
-  snippets              Snippet[]
-  resumes               Resume[]
-  skillRatings          SkillRating[]
-  sessions              Session[]             @relation("UserSessions")
-  messages              Message[]
-  sessionParticipants   SessionParticipant[]  @relation("UserSessionParticipants")
-  mentorConversations   MentorConversation[]  @relation("UserMentorConversations")
+enum Role {
+  USER
+  ADMIN
+}
 
+enum Visibility {
+  PUBLIC
+  UNLISTED
+  PRIVATE
+}
+
+/// Declaration order is the sort order (LIVE first) used by session listings.
+enum SessionStatus {
+  LIVE
+  SCHEDULED
+  ENDED
+}
+
+enum SessionVisibility {
+  PUBLIC
+  PRIVATE
+}
+
+enum ParticipantRole {
+  HOST
+  EDITOR
+  VIEWER
+}
+
+enum VoteTarget {
+  QUESTION
+  ANSWER
+}
+
+enum ReputationReason {
+  QUESTION_VOTE
+  ANSWER_VOTE
+  ANSWER_ACCEPTED
+  DOWNVOTE_CAST
+}
+
+enum NotificationType {
+  ANSWER_POSTED
+  ANSWER_ACCEPTED
+  CONTENT_UPVOTED
+  SNIPPET_STARRED
+  SESSION_STARTED
+}
+
+enum MentorRole {
+  user
+  assistant
+}
+
+model User {
+  id           String   @id @default(cuid())
+  username     String   @unique // stored lowercase
+  email        String   @unique // stored lowercase
+  passwordHash String
+  displayName  String?
+  bio          String?
+  avatarUrl    String?
+  reputation   Int      @default(0) // cached sum of ReputationEvent.delta
+  role         Role     @default(USER)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  refreshTokens       RefreshToken[]
+  questions           Question[]
+  answers             Answer[]
+  votes               Vote[]
+  snippets            Snippet[]
+  stars               SnippetStar[]
+  hostedSessions      Session[]            @relation("SessionHost")
+  participations      SessionParticipant[]
+  messages            Message[]
+  notifications       Notification[]       @relation("NotificationRecipient")
+  actedNotifications  Notification[]       @relation("NotificationActor")
+  reputationEvents    ReputationEvent[]
+  skills              SkillRating[]
+  mentorConversations MentorConversation[]
+  resumeReviews       ResumeReview[]
+
+  @@index([reputation(sort: Desc)])
   @@map("users")
 }
 
-model Question {
-  id        Int       @id @default(autoincrement())
-  title     String
-  body      String
-  tags      String[]
-  createdAt DateTime  @default(now())
-  userId    Int
-  user      User      @relation(fields: [userId], references: [id])
-  answers   Answer[]
+/// Rotating refresh tokens. Only a SHA-256 hash is stored. Tokens of one login share a
+/// familyId; presenting a revoked token revokes the whole family (reuse detection).
+model RefreshToken {
+  id         String    @id @default(cuid())
+  userId     String
+  tokenHash  String    @unique
+  familyId   String
+  expiresAt  DateTime
+  revokedAt  DateTime?
+  replacedBy String?
+  userAgent  String?
+  ip         String?
+  createdAt  DateTime  @default(now())
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
+  @@index([familyId])
+  @@index([userId])
+  @@map("refresh_tokens")
+}
+
+model Tag {
+  id        String     @id @default(cuid())
+  name      String     @unique
+  createdAt DateTime   @default(now())
+  questions Question[]
+  snippets  Snippet[]
+  sessions  Session[]
+
+  @@map("tags")
+}
+
+model Question {
+  id               String                   @id @default(cuid())
+  title            String
+  body             String
+  score            Int                      @default(0) // denormalised sum of votes
+  answerCount      Int                      @default(0)
+  viewCount        Int                      @default(0)
+  acceptedAnswerId String?                  @unique
+  authorId         String
+  createdAt        DateTime                 @default(now())
+  updatedAt        DateTime                 @updatedAt
+  lastActivityAt   DateTime                 @default(now())
+  /// Maintained by a database trigger (see migration "init"): weighted title + body.
+  searchVector     Unsupported("tsvector")?
+
+  author         User     @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  acceptedAnswer Answer?  @relation("AcceptedAnswer", fields: [acceptedAnswerId], references: [id], onDelete: SetNull)
+  answers        Answer[] @relation("QuestionAnswers")
+  tags           Tag[]
+  votes          Vote[]
+
+  @@index([createdAt(sort: Desc)])
+  @@index([score(sort: Desc)])
+  @@index([lastActivityAt(sort: Desc)])
+  @@index([authorId])
+  @@index([searchVector], type: Gin)
   @@map("questions")
 }
 
 model Answer {
-  id         Int      @id @default(autoincrement())
+  id         String   @id @default(cuid())
   body       String
+  score      Int      @default(0)
+  questionId String
+  authorId   String
   createdAt  DateTime @default(now())
-  userId     Int
-  user       User     @relation(fields: [userId], references: [id])
-  questionId Int
-  question   Question @relation(fields: [questionId], references: [id])
+  updatedAt  DateTime @updatedAt
 
+  question   Question  @relation("QuestionAnswers", fields: [questionId], references: [id], onDelete: Cascade)
+  acceptedOn Question? @relation("AcceptedAnswer")
+  author     User      @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  votes      Vote[]
+
+  @@index([questionId, score(sort: Desc)])
+  @@index([authorId])
   @@map("answers")
 }
 
-model Snippet {
-  id        Int      @id @default(autoincrement())
-  title     String
-  code      String
-  language  String
-  createdAt DateTime @default(now())
-  userId    Int
-  user      User     @relation(fields: [userId], references: [id])
+/// One row per (user, target). Exactly one of questionId / answerId is set
+/// (enforced by a CHECK constraint in the migration).
+model Vote {
+  id         String     @id @default(cuid())
+  userId     String
+  target     VoteTarget
+  questionId String?
+  answerId   String?
+  value      Int // +1 or -1; retracting deletes the row
+  createdAt  DateTime   @default(now())
+  updatedAt  DateTime   @updatedAt
 
+  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  question Question? @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  answer   Answer?   @relation(fields: [answerId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, questionId])
+  @@unique([userId, answerId])
+  @@map("votes")
+}
+
+/// Append-only ledger: every reputation change with its reason. User.reputation is the cache.
+model ReputationEvent {
+  id        String           @id @default(cuid())
+  userId    String
+  delta     Int
+  reason    ReputationReason
+  refId     String? // question / answer id that caused it
+  createdAt DateTime         @default(now())
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@map("reputation_events")
+}
+
+model Snippet {
+  id           String                   @id @default(cuid())
+  title        String
+  description  String                   @default("")
+  code         String
+  language     String
+  visibility   Visibility               @default(PUBLIC)
+  starCount    Int                      @default(0)
+  forkCount    Int                      @default(0)
+  forkedFromId String?
+  authorId     String
+  createdAt    DateTime                 @default(now())
+  updatedAt    DateTime                 @updatedAt
+  /// Maintained by a database trigger: weighted title + description + tags-free code excerpt.
+  searchVector Unsupported("tsvector")?
+
+  author     User          @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  forkedFrom Snippet?      @relation("Forks", fields: [forkedFromId], references: [id], onDelete: SetNull)
+  forks      Snippet[]     @relation("Forks")
+  tags       Tag[]
+  stars      SnippetStar[]
+
+  @@index([visibility, createdAt(sort: Desc)])
+  @@index([visibility, starCount(sort: Desc)])
+  @@index([authorId])
+  @@index([language])
+  @@index([searchVector], type: Gin)
   @@map("snippets")
 }
 
-model Resume {
-  id        Int      @id @default(autoincrement())
-  fileUrl   String
-  review    String?
+model SnippetStar {
+  userId    String
+  snippetId String
   createdAt DateTime @default(now())
-  userId    Int
-  user      User     @relation(fields: [userId], references: [id])
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  snippet   Snippet  @relation(fields: [snippetId], references: [id], onDelete: Cascade)
 
-  @@map("resumes")
-}
-
-model SkillRating {
-  id        Int      @id @default(autoincrement())
-  skillName String
-  rating    Int
-  createdAt DateTime @default(now())
-  userId    Int
-  user      User     @relation(fields: [userId], references: [id])
-
-  @@map("skill_ratings")
+  @@id([userId, snippetId])
+  @@index([snippetId])
+  @@map("snippet_stars")
 }
 
 model Session {
-  id              Int                   @id @default(autoincrement())
+  id              String            @id @default(cuid())
   title           String
-  description     String?
-  language        String                @default("javascript")
-  sessionType     String                @default("live-coding")
-  privacy         String                @default("public")
-  maxParticipants Int                   @default(20)
-  duration        Int                   @default(60)
-  tags            String[]
-  status          String                @default("scheduled") // scheduled, live, completed
-  code            String?
+  description     String            @default("")
+  language        String            @default("javascript")
+  status          SessionStatus     @default(SCHEDULED)
+  visibility      SessionVisibility @default(PUBLIC)
+  inviteCode      String?           @unique
+  maxParticipants Int               @default(10)
+  code            String            @default("") // plain-text snapshot of the shared document
+  docState        Bytes? // Yjs CRDT state (Y.encodeStateAsUpdate)
   scheduledFor    DateTime?
   startedAt       DateTime?
   endedAt         DateTime?
-  createdAt       DateTime              @default(now())
-  updatedAt       DateTime              @updatedAt @default(now())
-  hostUserId      Int
-  hostUser        User                  @relation("UserSessions", fields: [hostUserId], references: [id])
-  messages        Message[]
-  participants    SessionParticipant[]
+  hostId          String
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
 
+  host         User                 @relation("SessionHost", fields: [hostId], references: [id], onDelete: Cascade)
+  participants SessionParticipant[]
+  messages     Message[]
+  tags         Tag[]
+
+  @@index([visibility, status, createdAt(sort: Desc)])
+  @@index([hostId])
   @@map("sessions")
 }
 
 model SessionParticipant {
-  id        Int      @id @default(autoincrement())
-  sessionId Int
-  userId    Int
-  joinedAt  DateTime @default(now())
-  leftAt    DateTime?
-  session   Session  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
-  user      User     @relation("UserSessionParticipants", fields: [userId], references: [id])
+  sessionId String
+  userId    String
+  role      ParticipantRole @default(EDITOR)
+  joinedAt  DateTime        @default(now())
+  session   Session         @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  user      User            @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  @@unique([sessionId, userId])
+  @@id([sessionId, userId])
+  @@index([userId])
   @@map("session_participants")
 }
 
-model MentorConversation {
-  id        Int      @id @default(autoincrement())
-  userId    Int
-  topic     String   @default("general") // e.g., "debugging", "learning", "career", "code-review"
-  question  String?
-  code      String?  // Code snippet for review/analysis
-  response  String
-  modelUsed String?  // Which AI model was used
+model Message {
+  id        String   @id @default(cuid())
+  sessionId String
+  authorId  String
+  content   String
   createdAt DateTime @default(now())
-  user      User     @relation("UserMentorConversations", fields: [userId], references: [id])
+  session   Session  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  author    User     @relation(fields: [authorId], references: [id], onDelete: Cascade)
 
+  @@index([sessionId, createdAt(sort: Desc), id(sort: Desc)])
+  @@map("messages")
+}
+
+model Notification {
+  id        String           @id @default(cuid())
+  userId    String
+  actorId   String?
+  type      NotificationType
+  message   String
+  link      String
+  readAt    DateTime?
+  createdAt DateTime         @default(now())
+  user      User             @relation("NotificationRecipient", fields: [userId], references: [id], onDelete: Cascade)
+  actor     User?            @relation("NotificationActor", fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([userId, createdAt(sort: Desc), id(sort: Desc)])
+  @@index([userId, readAt])
+  @@map("notifications")
+}
+
+model SkillRating {
+  userId    String
+  name      String
+  rating    Int
+  updatedAt DateTime @updatedAt
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([userId, name])
+  @@map("skill_ratings")
+}
+
+model MentorConversation {
+  id        String          @id @default(cuid())
+  userId    String
+  topic     String          @default("general")
+  title     String          @default("New conversation")
+  createdAt DateTime        @default(now())
+  updatedAt DateTime        @updatedAt
+  user      User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messages  MentorMessage[]
+
+  @@index([userId, updatedAt(sort: Desc)])
   @@map("mentor_conversations")
 }
 
-model Message {
-  id        Int      @id @default(autoincrement())
-  content   String
-  createdAt DateTime @default(now())
-  userId    Int
-  user      User     @relation(fields: [userId], references: [id])
-  sessionId Int
-  session   Session  @relation(fields: [sessionId], references: [id])
+model MentorMessage {
+  id             String             @id @default(cuid())
+  conversationId String
+  role           MentorRole
+  content        String
+  model          String?
+  createdAt      DateTime           @default(now())
+  conversation   MentorConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
 
-  @@map("messages")
+  @@index([conversationId, createdAt])
+  @@map("mentor_messages")
+}
+
+model ResumeReview {
+  id         String   @id @default(cuid())
+  userId     String
+  fileName   String?
+  targetRole String?
+  result     Json
+  model      String
+  createdAt  DateTime @default(now())
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt(sort: Desc)])
+  @@map("resume_reviews")
 }

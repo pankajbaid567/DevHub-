@@ -1,0 +1,39 @@
+{
+  "name": "devhub-plus",
+  "private": true,
+  "version": "1.0.0",
+  "description": "DevHub+ — a real-time developer community platform: Q&A with reputation, code snippets, collaborative coding sessions and an AI mentor.",
+  "license": "MIT",
+  "author": "Pankaj Baid",
+  "engines": {
+    "node": ">=20.11"
+  },
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "dev": "npm run build -w @devhub/shared && concurrently -n api,web -c blue,magenta \"npm run dev -w @devhub/api\" \"npm run dev -w @devhub/web\"",
+    "build": "npm run build -w @devhub/shared && npm run build -w @devhub/api && npm run build -w @devhub/web",
+    "typecheck": "npm run build -w @devhub/shared && npm run typecheck --workspaces --if-present",
+    "lint": "eslint . --max-warnings=0",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "test": "npm run build -w @devhub/shared && npm run test --workspaces --if-present",
+    "db:up": "docker compose up -d postgres redis",
+    "db:migrate": "npm run prisma:migrate -w @devhub/api",
+    "db:seed": "npm run seed -w @devhub/api"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "concurrently": "^9.2.5",
+    "eslint": "^10.15.0",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "eslint-plugin-react-refresh": "^0.5.8",
+    "globals": "^17.14.0",
+    "prettier": "^3.10.1",
+    "typescript": "~5.9.3",
+    "typescript-eslint": "^8.73.0"
+  },
+  "type": "module"
+}
