@@ -26,7 +26,12 @@ import type { SessionBroadcaster } from './realtime/socket.js';
 
 export const API_PREFIX = '/api/v1';
 
-const noopBroadcaster: SessionBroadcaster = { status: () => {}, message: () => {} };
+const noopBroadcaster: SessionBroadcaster = {
+  status: () => {},
+  message: () => {},
+  runStarted: () => {},
+  runFinished: () => {},
+};
 
 export interface AppOptions {
   /** Real-time fan-out for REST-triggered events; absent in HTTP-only tests. */

@@ -23,6 +23,7 @@ Please use GitHub's **private vulnerability reporting** (Security tab → *Repor
 | Mass assignment and malformed input | zod schemas on every params, query and body, which also strip unknown keys | `core/validate.ts` |
 | Malicious uploads | PDF only, 2 MB cap, held in memory, **magic-byte check** (the client's MIME type isn't trusted) | `ai.routes.ts` (tested) |
 | Prompt injection | User content kept in user turns, separate from system prompts; retrieved community posts wrapped in `<community_sources>` and declared untrusted reference data; JSON outputs validated before use | ADR 0006, `prompts.ts` |
+| Remote code execution (by design: users run code) | A separate runner service on a network with no internet; read-only rootfs; all capabilities dropped; non-root; memory, CPU and pids caps; per-run ulimits, scrubbed environment, temp directory and process-group kill; one run per session and a per-user cooldown | `apps/runner`, ADR 0011, [system design](docs/SYSTEM_DESIGN.md#sandboxed-code-execution) |
 | Denial of service and cost abuse | Body size limits, page caps, chat throttling, Yjs update and document size caps, per-user AI hourly limit, AI timeouts with abort on disconnect | various |
 | Open redirect after login | `?next=` must be a same-site relative path | `lib/navigation.ts` (tested) |
 | Secrets misconfiguration | The environment is validated at boot: the secret must be at least 32 characters, placeholders are refused in production, and disabling rate limits is refused in production. Logs redact authorisation headers, cookies and passwords. | `config/env.ts`, `lib/logger.ts` |
@@ -32,5 +33,6 @@ Please use GitHub's **private vulnerability reporting** (Security tab → *Repor
 
 - Set `COOKIE_SECURE=true` and serve over HTTPS in production.
 - Set `TRUST_PROXY` to the number of proxies in front of the API, so rate limits see real client IPs.
+- Set a random `RUNNER_TOKEN` (shared by the API and the runner). For public deployments, run the runner under gVisor (`runtime: runsc`).
 - Use a real SMTP provider with SPF, DKIM and DMARC for the `MAIL_FROM` domain. Register exact OAuth callback URLs with GitHub and Google.
 - Rotate `JWT_ACCESS_SECRET` to invalidate every access token immediately. Refresh tokens can be revoked in the database by `familyId` or `userId`.

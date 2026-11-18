@@ -11,13 +11,32 @@ import { auth, createTestApp, registerUser, resetDb, type TestUser } from './hel
 
 type Client = Socket<ServerToClientEvents, ClientToServerEvents>;
 
-const { c } = createTestApp();
+/** Fake sandbox: echoes, can be slowed down or made to fail. */
+const runner = {
+  enabled: true,
+  delayMs: 0,
+  fail: false,
+  async run(input: { code: string; language: string }) {
+    if (this.delayMs) await new Promise((r) => setTimeout(r, this.delayMs));
+    if (this.fail) throw new Error('Runner unreachable');
+    return {
+      status: 'ok' as const,
+      stdout: `ran ${input.language}: ${input.code}\n`,
+      stderr: '',
+      exitCode: 0,
+      durationMs: 12,
+    };
+  },
+};
+const { c } = createTestApp({ codeRunner: runner });
 const lazy: { rt?: ReturnType<typeof attachRealtime> } = {};
 const { app } = createApp(c, {
   disableRateLimits: true,
   broadcaster: {
     status: (i, s) => lazy.rt?.broadcaster.status(i, s),
     message: (m) => lazy.rt?.broadcaster.message(m),
+    runStarted: (i, u, l) => lazy.rt?.broadcaster.runStarted(i, u, l),
+    runFinished: (r) => lazy.rt?.broadcaster.runFinished(r),
   },
 });
 const server = http.createServer(app);
@@ -258,5 +277,95 @@ describe('WebRTC signalling', () => {
     await a.emitWithAck('session:join', { sessionId });
     const res = await a.emitWithAck('rtc:join', { sessionId, audio: true, video: true });
     expect(res).toMatchObject({ ok: false, code: 'SESSION_NOT_LIVE' });
+  });
+});
+
+describe('code execution', () => {
+  beforeEach(() => {
+    runner.delayMs = 0;
+    runner.fail = false;
+  });
+
+  it('runs code and pushes start and result to everyone in the room', async () => {
+    const host = await registerUser(app);
+    const guest = await registerUser(app);
+    const id = await liveSession(host, guest);
+    const watcher = await client(guest.token);
+    await watcher.emitWithAck('session:join', { sessionId: id });
+    const started = once(watcher, 'run:started');
+    const finished = once(watcher, 'run:finished');
+
+    const res = await request(app)
+      .post(`/api/v1/sessions/${id}/runs`)
+      .set(auth(host))
+      .send({ language: 'python', code: 'print(1)' })
+      .expect(201);
+    expect(res.body).toMatchObject({ status: 'ok', stdout: 'ran python: print(1)\n' });
+    expect(await started).toMatchObject({
+      sessionId: id,
+      language: 'python',
+      user: { id: host.id },
+    });
+    expect(await finished).toMatchObject({ id: res.body.id, user: { id: host.id } });
+
+    const history = await request(app)
+      .get(`/api/v1/sessions/${id}/runs`)
+      .set(auth(guest))
+      .expect(200);
+    expect(history.body).toMatchObject({ enabled: true, items: [{ id: res.body.id }] });
+  });
+
+  it('allows one run per session at a time (distributed lock)', async () => {
+    const host = await registerUser(app);
+    const guest = await registerUser(app);
+    const id = await liveSession(host, guest);
+    runner.delayMs = 300;
+    const [a, b] = await Promise.all([
+      request(app)
+        .post(`/api/v1/sessions/${id}/runs`)
+        .set(auth(host))
+        .send({ language: 'javascript', code: '1' }),
+      request(app)
+        .post(`/api/v1/sessions/${id}/runs`)
+        .set(auth(guest))
+        .send({ language: 'javascript', code: '2' }),
+    ]);
+    expect([a.status, b.status].sort()).toEqual([201, 409]);
+  });
+
+  it('records runner outages as failed runs instead of erroring', async () => {
+    const host = await registerUser(app);
+    const guest = await registerUser(app);
+    const id = await liveSession(host, guest);
+    runner.fail = true;
+    const res = await request(app)
+      .post(`/api/v1/sessions/${id}/runs`)
+      .set(auth(host))
+      .send({ language: 'javascript', code: 'x' })
+      .expect(201);
+    expect(res.body).toMatchObject({ status: 'failed', stderr: 'Runner unreachable' });
+  });
+
+  it('refuses outsiders, unsupported languages and ended sessions', async () => {
+    const host = await registerUser(app);
+    const guest = await registerUser(app);
+    const outsider = await registerUser(app);
+    const id = await liveSession(host, guest);
+    await request(app)
+      .post(`/api/v1/sessions/${id}/runs`)
+      .set(auth(outsider))
+      .send({ language: 'python', code: '' })
+      .expect(403);
+    await request(app)
+      .post(`/api/v1/sessions/${id}/runs`)
+      .set(auth(host))
+      .send({ language: 'cobol', code: '' })
+      .expect(400);
+    await request(app).post(`/api/v1/sessions/${id}/end`).set(auth(host)).expect(200);
+    await request(app)
+      .post(`/api/v1/sessions/${id}/runs`)
+      .set(auth(guest))
+      .send({ language: 'python', code: '' })
+      .expect(409);
   });
 });

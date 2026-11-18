@@ -114,3 +114,41 @@ test.describe('accessibility of new pages', () => {
     });
   }
 });
+
+test('running code in a session shows the same output to every participant', async ({
+  browser,
+  request,
+}) => {
+  const status = await request.get('/api/v1/sessions?limit=1');
+  test.skip(!status.ok(), 'API not reachable');
+  const host = await (await browser.newContext()).newPage();
+  const guest = await (await browser.newContext()).newPage();
+  await signUp(host);
+  await signUp(guest);
+
+  await host.goto('/sessions/new');
+  await host.getByLabel('Title').fill(`Run ${Date.now()}`);
+  await host.getByRole('button', { name: 'Go live' }).click();
+  await expect(host.locator('.monaco-editor')).toBeVisible({ timeout: 30_000 });
+  const enabled = await host
+    .getByText('Code execution is not configured')
+    .isVisible({ timeout: 3_000 })
+    .catch(() => false);
+  test.skip(enabled, 'No code runner configured');
+
+  await guest.goto(host.url());
+  await guest.getByRole('button', { name: 'Join session' }).click();
+  await expect(guest.locator('.monaco-editor')).toBeVisible({ timeout: 30_000 });
+
+  await host.locator('.monaco-editor').click();
+  await host.keyboard.type('console.log([1, 2, 3].map((n) => n * 7).join("-"))');
+  await expect(guest.locator('.view-lines')).toContainText('n * 7');
+  await host.getByLabel('Run as language').selectOption('javascript');
+  await host.getByRole('button', { name: 'Run', exact: true }).click();
+
+  for (const page of [host, guest]) {
+    const output = page.getByRole('region', { name: 'Run output' });
+    await expect(output.getByText('7-14-21')).toBeVisible({ timeout: 20_000 });
+    await expect(output.getByText('Exited 0')).toBeVisible();
+  }
+});

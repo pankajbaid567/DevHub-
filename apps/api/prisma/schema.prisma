@@ -101,6 +101,7 @@ model User {
   skills              SkillRating[]
   mentorConversations MentorConversation[]
   resumeReviews       ResumeReview[]
+  codeRuns            CodeRun[]
   oauthAccounts       OAuthAccount[]
   emailTokens         EmailToken[]
 
@@ -333,6 +334,7 @@ model Session {
   participants SessionParticipant[]
   messages     Message[]
   tags         Tag[]
+  runs         CodeRun[]
 
   @@index([visibility, status, createdAt(sort: Desc)])
   @@index([hostId])
@@ -454,4 +456,25 @@ model ContentEmbedding {
   @@unique([kind, refId, chunk])
   @@index([kind, model])
   @@map("content_embeddings")
+}
+
+/// A sandboxed execution in a session (history shared with every participant).
+model CodeRun {
+  id         String   @id @default(cuid())
+  sessionId  String
+  userId     String
+  language   String
+  code       String
+  stdin      String?
+  status     String // ok | error | timeout | output_limit | failed
+  stdout     String
+  stderr     String
+  exitCode   Int?
+  durationMs Int
+  createdAt  DateTime @default(now())
+  session    Session  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId, createdAt(sort: Desc)])
+  @@map("code_runs")
 }

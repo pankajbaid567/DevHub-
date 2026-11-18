@@ -35,6 +35,7 @@ import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Field';
 import { PageSpinner } from '../../components/ui/Spinner';
 import { CallPanel } from '../../components/CallPanel';
+import { RunPanel } from '../../components/RunPanel';
 import { useSessionDoc } from '../../lib/useSessionDoc';
 import { useCall } from '../../lib/useCall';
 
@@ -124,8 +125,16 @@ function Workspace({
         <div className="relative min-h-0 flex-1">
           {session ? (
             <Suspense fallback={<Skeleton className="h-full w-full rounded-none" />}>
-              <div className={view === 'code' ? 'h-full' : 'hidden'}>
-                <CollabEditor session={session} language={language} readOnly={readOnly} />
+              <div className={view === 'code' ? 'flex h-full flex-col' : 'hidden'}>
+                <div className="min-h-0 flex-1">
+                  <CollabEditor session={session} language={language} readOnly={readOnly} />
+                </div>
+                <RunPanel
+                  sessionId={sessionId}
+                  session={session}
+                  language={language}
+                  canRun={live && !readOnly}
+                />
               </div>
               <div className={view === 'board' ? 'h-full' : 'hidden'}>
                 <Whiteboard session={session} readOnly={readOnly} canClear={isHost} me={me} />

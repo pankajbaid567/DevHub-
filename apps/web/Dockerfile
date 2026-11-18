@@ -5,6 +5,7 @@ COPY package.json package-lock.json ./
 COPY packages/shared/package.json packages/shared/
 COPY apps/api/package.json apps/api/
 COPY apps/web/package.json apps/web/
+COPY apps/runner/package.json apps/runner/
 RUN --mount=type=cache,target=/root/.npm npm ci --workspace @devhub/shared --workspace @devhub/web --include-workspace-root=false
 COPY tsconfig.base.json ./
 COPY packages/shared packages/shared

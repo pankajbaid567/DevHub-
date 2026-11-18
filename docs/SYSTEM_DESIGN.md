@@ -114,6 +114,31 @@ flowchart LR
 - **Degradation:** if embeddings fail, the mentor answers ungrounded and search returns keyword results. Without a key, a feature-hashing embedder (word unigrams, bigrams and character trigrams) keeps everything working offline, with its own calibrated thresholds.
 - **Scale:** at 768 dimensions × 4 bytes, about 3 KB per chunk, 1M chunks is about 3 GB plus the index, which is comfortable on one Postgres. Next steps: `halfvec` (2× smaller), iterative index scans for filtered queries, then a dedicated vector store only if recall or latency demands it.
 
+## Sandboxed code execution
+
+Running strangers' code is the riskiest thing the product does, so it is isolated in layers, each of which assumes the one inside it can fail:
+
+| Layer | Controls |
+|---|---|
+| **API** (`RunsService`) | Participants with edit rights only, live sessions only, code ≤ 64 KB and stdin ≤ 16 KB, one run per session at a time (a Redis `SET NX` lock that holds across replicas), a 2 s per-user cooldown. Runner outages become a stored `failed` run, not a 500. |
+| **Runner service** (`apps/runner`) | Bearer token checked in constant time, a bounded concurrency semaphore with a bounded queue (back-pressure: 503 instead of overload), no dependencies. |
+| **Per run** (`sandbox.ts`) | A fresh temporary directory deleted afterwards; an environment reduced to `PATH`, `HOME` and `LANG` (no tokens); `ulimit` for CPU time, address space (Python), processes, file size and core dumps; the V8 heap capped; a 5 s wall clock, then `SIGKILL` to the whole process group (repeated, to beat fork races); 64 KB output caps. |
+| **Container** (`docker-compose.yml`) | An `internal: true` network with no gateway, `read_only` root filesystem, a 64 MB `nosuid,nodev` tmpfs, `cap_drop: [ALL]`, `no-new-privileges`, 512 MB memory, 1 CPU, `pids_limit: 128`, a non-root user, and `init: true` (tini reaps zombies). |
+| **Next** | For hostile public traffic: run the container under gVisor (`runtime: runsc`) or Firecracker microVMs, and add per-run network namespaces and seccomp profiles. |
+
+Verified against the running Docker stack with deliberately hostile programs:
+
+| Program | Result |
+|---|---|
+| `urllib.request.urlopen("https://example.com")` | No route, killed at the 5 s limit |
+| `open("/srv/pwned", "w")` | `OSError: Read-only file system` |
+| Print `process.env` | Only `PATH, HOME, LANG, PYTHONIOENCODING, PWD, SHLVL` |
+| `bytearray(1 GiB)` | `MemoryError` |
+| `while True: os.fork()` | Contained, killed at 5 s; **the next run succeeds** |
+| `for(;;) spawn("sleep", ["60"])` | Contained, killed at 5 s; next run succeeds; 4 processes left in the container |
+
+The first version failed the fork-bomb test in an instructive way. The bomb was killed, but its orphans became zombies, because Node as PID 1 doesn't reap them. They held the pids cgroup at its limit, so the *next* run couldn't start a thread. The fix was tini, a per-user process ulimit and a repeated group kill.
+
 ## Caching
 
 | Data | Strategy | TTL | Invalidation |

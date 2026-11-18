@@ -26,6 +26,12 @@ import { BullJobQueue, InlineJobQueue, type JobHandlers, type JobQueue } from '.
 import { Outbox } from './jobs/outbox.js';
 import { LogMailer, SmtpMailer, type Mailer } from './jobs/mailer.js';
 import { createHandlers } from './jobs/handlers.js';
+import { RunsService } from './modules/runs/runs.service.js';
+import {
+  DisabledCodeRunner,
+  HttpCodeRunner,
+  type CodeRunner,
+} from './modules/runs/runner.client.js';
 
 /**
  * Composition root: the one place where concrete implementations are chosen and wired.
@@ -54,6 +60,7 @@ export interface Container {
   oauth: OAuthService;
   indexer: SearchIndexer;
   search: SearchService;
+  runs: RunsService;
 }
 
 export interface ContainerOverrides {
@@ -65,6 +72,7 @@ export interface ContainerOverrides {
   /** HTTP client for OAuth provider calls (faked in tests). */
   oauthFetch?: typeof fetch;
   oauthConfigs?: Env['oauth'];
+  codeRunner?: CodeRunner;
   /** Retry delay for the in-process queue (tests use 0). */
   inlineRetryDelay?: (attempt: number) => number;
 }
@@ -131,6 +139,13 @@ export function createContainer(env: Env, overrides: ContainerOverrides = {}): C
         )
       : new DemoProvider());
 
+  const sessions = new SessionsService(db, events, outbox);
+  const codeRunner: CodeRunner =
+    overrides.codeRunner ??
+    (env.CODE_RUNNER_URL && env.RUNNER_TOKEN
+      ? new HttpCodeRunner(env.CODE_RUNNER_URL, env.RUNNER_TOKEN)
+      : new DisabledCodeRunner());
+
   Object.assign(
     handlers,
     createHandlers({ db, logger, mailer, outbox, tokens, notifications, indexer }),
@@ -148,7 +163,7 @@ export function createContainer(env: Env, overrides: ContainerOverrides = {}): C
     auth: new AuthService(db, tokens, new EmailTokenService(), outbox, env.publicUrl),
     questions: new QuestionsService(db, cache, events, reputation),
     snippets: new SnippetsService(db, events),
-    sessions: new SessionsService(db, events, outbox),
+    sessions,
     notifications,
     users: new UsersService(db, cache),
     ai: new AiService(db, aiProvider, logger, metrics, (text) => search.retrieve(text)),
@@ -162,5 +177,6 @@ export function createContainer(env: Env, overrides: ContainerOverrides = {}): C
     ),
     indexer,
     search,
+    runs: new RunsService(db, cache, sessions, codeRunner, logger),
   };
 }

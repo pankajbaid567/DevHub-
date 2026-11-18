@@ -77,3 +77,30 @@ export interface ChatMessageDto {
   author: UserSummary;
   createdAt: string;
 }
+
+/** Languages the sandboxed runner can execute. */
+export const RUNNABLE_LANGUAGES = ['javascript', 'typescript', 'python'] as const;
+export type RunnableLanguage = (typeof RUNNABLE_LANGUAGES)[number];
+
+export const runCodeSchema = z.object({
+  language: z.enum(RUNNABLE_LANGUAGES),
+  code: z.string().max(64_000),
+  stdin: z.string().max(16_000).optional(),
+});
+export type RunCodeInput = z.infer<typeof runCodeSchema>;
+
+export type RunStatus = 'ok' | 'error' | 'timeout' | 'output_limit' | 'failed';
+
+/** One execution in a session, shared live with every participant. */
+export interface CodeRunDto {
+  id: string;
+  sessionId: string;
+  user: UserSummary;
+  language: RunnableLanguage;
+  status: RunStatus;
+  stdout: string;
+  stderr: string;
+  exitCode: number | null;
+  durationMs: number;
+  createdAt: string;
+}

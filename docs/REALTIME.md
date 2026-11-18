@@ -41,6 +41,8 @@ Acks are `{ ok: true, data }` or `{ ok: false, code, message }`.
 | `doc:update`, `doc:awareness` | From other participants |
 | `chat:message`, `chat:typing` | |
 | `notification:new` | `NotificationDto` |
+| `run:started` | `{ sessionId, user, language }`: someone pressed Run (triggered by `POST /sessions/:id/runs`) |
+| `run:finished` | `CodeRunDto` (status, stdout, stderr, exit code, duration), shown to everyone in the room |
 | `auth:expired` | Refresh the token and reconnect |
 | `rtc:peer-joined`, `rtc:peer-left` | Call membership changes |
 | `rtc:signal` | `{ sessionId, from, description? \| candidate? }` from a call member |

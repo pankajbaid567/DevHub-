@@ -73,6 +73,13 @@ const envSchema = z
     GITHUB_CLIENT_SECRET: z.string().optional(),
     GOOGLE_CLIENT_ID: z.string().optional(),
     GOOGLE_CLIENT_SECRET: z.string().optional(),
+    /** Sandboxed code runner (apps/runner). Unset: the Run button is disabled. */
+    CODE_RUNNER_URL: z
+      .string()
+      .url()
+      .optional()
+      .or(z.literal('').transform(() => undefined)),
+    RUNNER_TOKEN: z.string().optional(),
     AI_REQUESTS_PER_HOUR: z.coerce.number().int().min(1).max(1_000).default(30),
     /** Disable only for local load/E2E testing; refused in production. */
     RATE_LIMITS_ENABLED: z

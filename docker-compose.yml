@@ -58,10 +58,34 @@ services:
       GITHUB_CLIENT_SECRET: ${GITHUB_CLIENT_SECRET:-}
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
       GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
-      CODE_RUNNER_URL: ${CODE_RUNNER_URL:-}
+      CODE_RUNNER_URL: ${CODE_RUNNER_URL:-http://runner:2000}
+      RUNNER_TOKEN: ${RUNNER_TOKEN:-devhub-runner-local-token}
+    networks: [default, sandbox]
     depends_on:
       postgres: { condition: service_healthy }
       redis: { condition: service_healthy }
+      runner: { condition: service_started }
+    restart: unless-stopped
+
+  # Sandboxed code execution for sessions. Defence in depth: reachable only from the API on an
+  # internal network with no internet route; read-only root filesystem; every Linux capability
+  # dropped; no privilege escalation; memory, CPU and process-count caps; tiny tmpfs.
+  runner:
+    build: { context: ., dockerfile: apps/runner/Dockerfile }
+    environment:
+      RUNNER_TOKEN: ${RUNNER_TOKEN:-devhub-runner-local-token}
+      RUNNER_CONCURRENCY: 2
+      RUNNER_MAX_PROCS: 96
+    # tini as PID 1 reaps orphaned/zombie processes left by killed programs.
+    init: true
+    networks: [sandbox]
+    read_only: true
+    tmpfs: ['/tmp:size=64m,mode=1777,nosuid,nodev']
+    cap_drop: [ALL]
+    security_opt: ['no-new-privileges:true']
+    mem_limit: 512m
+    cpus: 1.0
+    pids_limit: 128
     restart: unless-stopped
 
   web:
@@ -70,6 +94,11 @@ services:
     depends_on:
       api: { condition: service_healthy }
     restart: unless-stopped
+
+networks:
+  # internal: true means no gateway, so containers on it cannot reach the internet.
+  sandbox:
+    internal: true
 
 volumes:
   pgdata:

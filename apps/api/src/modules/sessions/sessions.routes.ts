@@ -1,4 +1,5 @@
 import {
+  runCodeSchema,
   createSessionSchema,
   cursorQuerySchema,
   idParamSchema,
@@ -162,6 +163,44 @@ export function sessionRoutes(
       );
       broadcast.message(m);
       res.status(201).json(m);
+    },
+  });
+
+  // ---------------------------------------------------------------- code execution
+
+  defineRoute(ctx, {
+    method: 'post',
+    path: '/:id/runs',
+    tag: 'Sessions',
+    summary: 'Run code in the sandbox; the result is pushed to everyone in the session',
+    auth: 'required',
+    params: idParamSchema,
+    body: runCodeSchema,
+    responses: {
+      201: 'Finished (including runtime errors and timeouts)',
+      409: 'Not live, or a run is already in progress',
+      429: 'Too many runs',
+      503: 'Execution not configured',
+    },
+    handler: async (req, res) => {
+      res
+        .status(201)
+        .json(await c.runs.run(currentUser(req), req.params.id as string, req.body, broadcast));
+    },
+  });
+
+  defineRoute(ctx, {
+    method: 'get',
+    path: '/:id/runs',
+    tag: 'Sessions',
+    summary: 'Recent runs in a session (participants only)',
+    auth: 'required',
+    params: idParamSchema,
+    handler: async (req, res) => {
+      res.json({
+        enabled: c.runs.enabled,
+        items: await c.runs.history(currentUser(req), req.params.id as string),
+      });
     },
   });
 }

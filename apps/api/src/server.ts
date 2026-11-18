@@ -17,6 +17,8 @@ async function main(): Promise<void> {
   const broadcaster: SessionBroadcaster = {
     status: (id, s) => realtime?.broadcaster.status(id, s),
     message: (m) => realtime?.broadcaster.message(m),
+    runStarted: (id, u, l) => realtime?.broadcaster.runStarted(id, u, l),
+    runFinished: (r) => realtime?.broadcaster.runFinished(r),
   };
 
   const { app } = createApp(c, { broadcaster });

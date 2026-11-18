@@ -1,4 +1,4 @@
-import type { ChatMessageDto, ParticipantRole, SessionStatus } from './sessions.js';
+import type { ChatMessageDto, CodeRunDto, ParticipantRole, SessionStatus } from './sessions.js';
 import type { NotificationDto } from './notifications.js';
 import type { UserSummary } from './common.js';
 
@@ -80,6 +80,9 @@ export interface ServerToClientEvents {
   'doc:update': (p: { sessionId: string; update: Uint8Array }) => void;
   'doc:awareness': (p: { sessionId: string; update: Uint8Array }) => void;
   'notification:new': (n: NotificationDto) => void;
+  /** Someone pressed Run: everyone's output panel shows it is running. */
+  'run:started': (p: { sessionId: string; user: UserSummary; language: string }) => void;
+  'run:finished': (r: CodeRunDto) => void;
   'rtc:peer-joined': (p: { sessionId: string; peer: RtcPeer }) => void;
   'rtc:peer-left': (p: { sessionId: string; socketId: string }) => void;
   'rtc:signal': (p: RtcSignal & { from: string }) => void;

@@ -8,7 +8,7 @@
 
 [![CI](https://github.com/pankajbaid567/DevHub-/actions/workflows/ci.yml/badge.svg)](https://github.com/pankajbaid567/DevHub-/actions/workflows/ci.yml)
 ![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178c6)
-![Tests](https://img.shields.io/badge/tests-154%20passing-brightgreen)
+![Tests](https://img.shields.io/badge/tests-170%20passing-brightgreen)
 ![License](https://img.shields.io/badge/license-MIT-blue)
 
 <img src="docs/screenshots/session.png" alt="Two developers editing the same file in real time, with a remote cursor, presence and chat" width="100%" />
@@ -33,6 +33,7 @@
 |---|---|
 | **Q&A with reputation** | Ask, answer, vote and accept answers. Reputation is computed in the same database transaction as each vote and recorded in an auditable ledger. Postgres full-text search with ranking and `"phrase"`, `-exclude` and `or` syntax. |
 | **Live collaborative coding** | A shared Monaco editor synchronised with **Yjs CRDTs** over Socket.IO, with remote cursors, presence, typing indicators and chat. Private sessions use invite codes. Capacity is enforced under a row lock, and the host can start and end sessions. |
+| **Run code together** | Press **Run** (or Ctrl/Cmd+Enter) in a session to execute the shared JavaScript, TypeScript or Python in a **sandboxed runner service**, with optional stdin. Everyone in the room sees "running…" and then the same output, exit status and timing. Run history is kept. |
 | **Shared whiteboard** | Draw together in the same session, with live strokes and remote cursors. It has pen, highlighter, eraser, colours and widths, per-user undo and redo (Yjs `UndoManager`), host-only clear and PNG export. It is stored in the same CRDT document as the code, so it syncs across servers and persists automatically. |
 | **Video and voice calls** | **WebRTC** peer-to-peer calls in each session, with mute, camera, screen share (switched in place with `replaceTrack`), a speaking indicator and automatic rejoin. Uses perfect negotiation, server-side signalling restricted to call members, and STUN plus optional TURN. Up to 6 people (mesh). |
 | **AI mentor grounded in the community (RAG)** | Multi-turn conversations streamed token by token over Server-Sent Events. Before answering, the mentor retrieves the most relevant community answers (pgvector), favouring accepted and well-voted ones, and cites them inline as **[1]**, **[2]** with links to the source. You can switch grounding off per message. |
@@ -67,6 +68,11 @@ These are the parts I'd point a reviewer to.
   - Indexing is asynchronous and self-healing: a periodic reconcile job embeds anything missing, re-indexes everything when the model changes and drops orphans. Writers are serialised per document with an advisory lock.
   - Retrieved posts are passed to the model as tagged, untrusted data, a prompt-injection defence.
   - Without an API key, an offline feature-hashing embedder keeps every feature working in CI.
+- **Sandboxed code execution, attacked on purpose.** User code runs in a separate `apps/runner` service with layered isolation:
+  - **container:** an internal Docker network with no internet route, a read-only root filesystem, `cap_drop: ALL`, `no-new-privileges`, memory, CPU and pids limits, and tini to reap orphans;
+  - **per run:** a scrubbed environment, a throwaway directory, ulimits (CPU, address space, processes, file size), output caps and a wall-clock `SIGKILL` of the whole process group;
+  - **API:** editors only, live sessions only, a distributed one-run-per-session lock and a per-user cooldown.
+  - Verified with hostile programs (network exfiltration, filesystem writes, environment snooping, a 1 GB allocation, `fork()` and `spawn()` bombs). Each is contained, and the next run still works ([results](docs/SYSTEM_DESIGN.md#sandboxed-code-execution)).
 - **Resilient AI integration.** Gemini sits behind a provider interface:
   - The primary model gets 60% of the time budget, and a timeout or overload falls back to a second model.
   - A circuit breaker skips a failing primary for 60 seconds.
@@ -107,6 +113,7 @@ flowchart LR
   API1 & API2 <--> REDIS[("Redis<br/>pub/sub · cache · rate limits · BullMQ jobs")]
   API1 & API2 --> GEMINI["Gemini API<br/>chat · embeddings"]
   API1 & API2 --> SMTP["SMTP<br/>(Mailpit locally)"]
+  API1 & API2 -- "internal network, no internet" --> RUN["Code runner<br/>sandboxed JS · TS · Python"]
 ```
 
 Inside the API, every module follows **route → service → Prisma**, with cross-cutting concerns as middleware:
@@ -171,14 +178,15 @@ Without a `GEMINI_API_KEY`, the AI features use a deterministic demo provider (l
 
 ## Testing
 
-There are **154 automated tests**:
+There are **170 automated tests**:
 
 | Suite | Count | Covers |
 |---|---|---|
-| API integration and unit (`apps/api/test`) | 110 | Every endpoint against a real Postgres: auth and token rotation with reuse detection, voting idempotency and concurrency, the reputation ledger, accept/un-accept, privacy rules, session capacity races, chat pagination, SSE streaming, schema-validated AI output, PDF magic bytes, sockets (authentication, CRDT sync, identity spoofing), merge-on-save persistence, WebRTC signalling isolation, Gemini fallback and circuit breaker. **Outbox:** rollback writes no job, crash replay delivers once, concurrent relays, poison-row backoff, retries. **Email verification, password reset** (single use, concurrent resets, no enumeration, all devices signed out). **OAuth:** PKCE, state mismatch, open redirect, account linking. **Semantic search:** indexing, unchanged-content skip, reconcile after a model change, concurrent indexing, duplicates, hybrid RRF, RAG citations and graceful degradation. BullMQ against real Redis. |
+| API integration and unit (`apps/api/test`) | 114 | Every endpoint against a real Postgres: auth and token rotation with reuse detection, voting idempotency and concurrency, the reputation ledger, accept/un-accept, privacy rules, session capacity races, chat pagination, SSE streaming, schema-validated AI output, PDF magic bytes, sockets (authentication, CRDT sync, identity spoofing), merge-on-save persistence, WebRTC signalling isolation, Gemini fallback and circuit breaker. **Outbox:** rollback writes no job, crash replay delivers once, concurrent relays, poison-row backoff, retries. **Email verification, password reset** (single use, concurrent resets, no enumeration, all devices signed out). **OAuth:** PKCE, state mismatch, open redirect, account linking. **Semantic search:** indexing, unchanged-content skip, reconcile after a model change, concurrent indexing, duplicates, hybrid RRF, RAG citations and graceful degradation. BullMQ against real Redis. **Code runs:** pushed to the room, one-at-a-time lock, outage handling, permissions. |
+| Code runner (`apps/runner/test`) | 11 | Streams and stdin, runtime errors, infinite-loop kill, child-process group kill, output floods, environment scrubbing, per-run directories, back-pressure, token auth, validation |
 | Shared (`packages/shared`) | 8 | Reputation maths and schema normalisation |
 | Web unit and component (`apps/web/src`) | 15 | Single-flight token refresh, open-redirect guard, optimistic votes with rollback, markdown XSS sanitisation |
-| End-to-end (`apps/web/e2e`) | 21 | Sign-up, sign-in and session restore. The two-user Q&A loop with a live notification. **Two browsers co-editing one session.** **Whiteboard sync and undo.** **A two-way video call.** **Email verification and password reset through a real SMTP inbox (Mailpit).** **Duplicate warning while asking, hybrid search and mentor citations.** axe accessibility checks on eight pages |
+| End-to-end (`apps/web/e2e`) | 22 | Sign-up, sign-in and session restore. The two-user Q&A loop with a live notification. **Two browsers co-editing one session.** **Whiteboard sync and undo.** **A two-way video call.** **Email verification and password reset through a real SMTP inbox (Mailpit).** **Duplicate warning while asking, hybrid search and mentor citations.** **Running code in a session, with the output shown to both participants.** axe accessibility checks on eight pages |
 
 The E2E suite also passes against the production Docker stack (nginx, two API replicas, Redis, Postgres).
 
@@ -198,6 +206,7 @@ apps/
       realtime/        Socket.IO gateway + Yjs DocManager
       container.ts     composition root (dependency injection)
     test/              integration + unit tests
+  runner/              sandboxed code-execution service (no dependencies; hardened container)
   web/                 React SPA
     src/
       auth/ theme/     providers

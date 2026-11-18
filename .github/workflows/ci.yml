@@ -52,6 +52,7 @@ jobs:
       - run: npm run build -w @devhub/shared
       - run: npm test -w @devhub/shared
       - run: npm test -w @devhub/api
+      - run: npm test -w @devhub/runner
       - name: Schema drift check (migrations must match schema.prisma)
         working-directory: apps/api
         env: { DATABASE_URL: '${{ env.TEST_DATABASE_URL }}' }
@@ -124,6 +125,15 @@ jobs:
           {
             context: .,
             file: apps/api/Dockerfile,
+            push: false,
+            cache-from: type=gha,
+            cache-to: 'type=gha,mode=max',
+          }
+      - uses: docker/build-push-action@v6
+        with:
+          {
+            context: .,
+            file: apps/runner/Dockerfile,
             push: false,
             cache-from: type=gha,
             cache-to: 'type=gha,mode=max',

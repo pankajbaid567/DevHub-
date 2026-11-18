@@ -1,4 +1,5 @@
 import type { Server as HttpServer } from 'node:http';
+import type { RunBroadcaster } from '../modules/runs/runs.service.js';
 import { Server, type Socket } from 'socket.io';
 import { createAdapter } from '@socket.io/redis-adapter';
 import {
@@ -45,7 +46,7 @@ type ClientSocket = Socket<
   SocketData
 >;
 
-export interface SessionBroadcaster {
+export interface SessionBroadcaster extends RunBroadcaster {
   status(sessionId: string, status: SessionStatus): void;
   message(m: ChatMessageDto): void;
 }
@@ -363,6 +364,12 @@ export function attachRealtime(httpServer: HttpServer, c: Container) {
     },
     message(m) {
       io.to(room(m.sessionId)).emit('chat:message', m);
+    },
+    runStarted(sessionId, user, language) {
+      io.to(room(sessionId)).emit('run:started', { sessionId, user, language });
+    },
+    runFinished(run) {
+      io.to(room(run.sessionId)).emit('run:finished', run);
     },
   };
 
