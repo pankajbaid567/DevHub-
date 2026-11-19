@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import type { UserSummary } from './common.js';
 
 /**
  * Interview mode: a session with a problem statement, a server-kept timer, private
@@ -7,6 +8,8 @@ import { z } from 'zod';
 
 export type Difficulty = 'Easy' | 'Medium' | 'Hard';
 
+export type RunnableProblemLanguage = 'javascript' | 'typescript' | 'python';
+
 export interface InterviewProblem {
   slug: string;
   title: string;
@@ -14,12 +17,25 @@ export interface InterviewProblem {
   topics: string[];
   /** Markdown. */
   statement: string;
+  /** A function called with each test's arguments, or a class driven by a sequence of calls. */
+  kind: 'function' | 'class';
+  /** The function or class name the tests call, per language (TypeScript uses the JavaScript name). */
+  entry: { javascript: string; python: string };
+  starter: Record<RunnableProblemLanguage, string>;
 }
 
 /** A small built-in bank, so an interviewer can start in two clicks. */
 export const INTERVIEW_PROBLEMS: readonly InterviewProblem[] = [
   {
     slug: 'two-sum',
+    kind: 'function',
+    entry: { javascript: 'twoSum', python: 'two_sum' },
+    starter: {
+      javascript: 'function twoSum(nums, target) {\n  // Return the two indices, e.g. [0, 1]\n}\n',
+      typescript:
+        'function twoSum(nums: number[], target: number): number[] {\n  // Return the two indices, e.g. [0, 1]\n  return [];\n}\n',
+      python: 'def two_sum(nums, target):\n    # Return the two indices, e.g. [0, 1]\n    pass\n',
+    },
     title: 'Two Sum',
     difficulty: 'Easy',
     topics: ['arrays', 'hash map'],
@@ -33,6 +49,13 @@ You may assume exactly one solution exists, and you may not use the same element
   },
   {
     slug: 'valid-parentheses',
+    kind: 'function',
+    entry: { javascript: 'isValid', python: 'is_valid' },
+    starter: {
+      javascript: 'function isValid(s) {\n  // Return true or false\n}\n',
+      typescript: 'function isValid(s: string): boolean {\n  return false;\n}\n',
+      python: 'def is_valid(s):\n    # Return True or False\n    pass\n',
+    },
     title: 'Valid Parentheses',
     difficulty: 'Easy',
     topics: ['stack', 'strings'],
@@ -42,6 +65,15 @@ You may assume exactly one solution exists, and you may not use the same element
   },
   {
     slug: 'merge-intervals',
+    kind: 'function',
+    entry: { javascript: 'merge', python: 'merge' },
+    starter: {
+      javascript:
+        'function merge(intervals) {\n  // Return the merged intervals, sorted by start\n}\n',
+      typescript: 'function merge(intervals: number[][]): number[][] {\n  return [];\n}\n',
+      python:
+        'def merge(intervals):\n    # Return the merged intervals, sorted by start\n    pass\n',
+    },
     title: 'Merge Intervals',
     difficulty: 'Medium',
     topics: ['sorting', 'arrays'],
@@ -53,6 +85,16 @@ Discuss the complexity, and what changes if the intervals arrive as a stream.`,
   },
   {
     slug: 'lru-cache',
+    kind: 'class',
+    entry: { javascript: 'LRUCache', python: 'LRUCache' },
+    starter: {
+      javascript:
+        'class LRUCache {\n  constructor(capacity) {}\n\n  get(key) {\n    return -1;\n  }\n\n  put(key, value) {}\n}\n',
+      typescript:
+        'class LRUCache {\n  constructor(capacity: number) {}\n\n  get(key: number): number {\n    return -1;\n  }\n\n  put(key: number, value: number): void {}\n}\n',
+      python:
+        'class LRUCache:\n    def __init__(self, capacity):\n        pass\n\n    def get(self, key):\n        return -1\n\n    def put(self, key, value):\n        pass\n',
+    },
     title: 'LRU Cache',
     difficulty: 'Medium',
     topics: ['design', 'hash map', 'linked list'],
@@ -64,15 +106,35 @@ Implement \`get(key)\` (returns the value or -1) and \`put(key, value)\`. Both m
   },
   {
     slug: 'rate-limiter',
+    kind: 'class',
+    entry: { javascript: 'RateLimiter', python: 'RateLimiter' },
+    starter: {
+      javascript:
+        'class RateLimiter {\n  constructor(limit, windowSeconds) {}\n\n  allow(userId, now) {\n    // now is in seconds; return true or false\n  }\n}\n',
+      typescript:
+        'class RateLimiter {\n  constructor(limit: number, windowSeconds: number) {}\n\n  allow(userId: string, now: number): boolean {\n    return false;\n  }\n}\n',
+      python:
+        'class RateLimiter:\n    def __init__(self, limit, window_seconds):\n        pass\n\n    def allow(self, user_id, now):\n        # now is in seconds; return True or False\n        pass\n',
+    },
     title: 'Rate Limiter',
     difficulty: 'Medium',
     topics: ['design', 'queues', 'time'],
-    statement: `Implement \`allow(userId, now)\` for a limiter that permits at most **N requests per user in any sliding window of W seconds**.
+    statement: `Implement a \`RateLimiter(limit, windowSeconds)\` class with \`allow(userId, now)\`, which permits at most **limit requests per user in any sliding window of windowSeconds**. A request at time \`now\` (seconds) is allowed if fewer than \`limit\` requests by that user were *allowed* in \`(now - windowSeconds, now]\`; rejected requests don't count.
 
 Start with a single process, then discuss how you would enforce it across many API servers (for example with Redis), and the trade-offs between a fixed window, a sliding log and a token bucket.`,
   },
   {
     slug: 'top-k-frequent',
+    kind: 'function',
+    entry: { javascript: 'topKFrequent', python: 'top_k_frequent' },
+    starter: {
+      javascript:
+        'function topKFrequent(words, k) {\n  // Most frequent first; ties alphabetical\n}\n',
+      typescript:
+        'function topKFrequent(words: string[], k: number): string[] {\n  return [];\n}\n',
+      python:
+        'def top_k_frequent(words, k):\n    # Most frequent first; ties alphabetical\n    pass\n',
+    },
     title: 'Top K Frequent Words',
     difficulty: 'Hard',
     topics: ['heap', 'hash map', 'streaming'],
@@ -119,7 +181,15 @@ export type InterviewControlInput = z.infer<typeof interviewControlSchema>;
 export interface InterviewStateDto {
   sessionId: string;
   /** Null for the candidate until the interviewer starts the clock. */
-  problem: { title: string; statement: string; difficulty: Difficulty | null } | null;
+  problem: {
+    title: string;
+    statement: string;
+    difficulty: Difficulty | null;
+    /** Bank problems only (null for a custom problem). */
+    slug: string | null;
+    /** Whether solutions can be checked against tests. */
+    hasTests: boolean;
+  } | null;
   problemHidden: boolean;
   durationMinutes: number;
   startedAt: string | null;
@@ -208,4 +278,75 @@ export interface InterviewFeedbackDto extends AiInterviewFeedback {
   isDemo: boolean;
   turns: number;
   createdAt: string;
+}
+
+export const submitSolutionSchema = z.object({
+  language: z.enum(['javascript', 'typescript', 'python']),
+  code: z.string().min(1).max(64_000),
+});
+export type SubmitSolutionInput = z.infer<typeof submitSolutionSchema>;
+
+export interface TestCaseResultDto {
+  index: number;
+  hidden: boolean;
+  passed: boolean;
+  /** Visible tests only: what was called, what was expected and what came back. */
+  input?: string;
+  expected?: string;
+  actual?: string;
+  /** An exception thrown by the solution for this test (shown for hidden tests too). */
+  error?: string;
+}
+
+export type SubmissionStatus = 'passed' | 'failed' | 'error' | 'timeout';
+
+/** A solution checked against the problem's tests, shared live with the room. */
+export interface SubmissionDto {
+  id: string;
+  sessionId: string;
+  user: UserSummary;
+  problemSlug: string;
+  language: RunnableProblemLanguage;
+  status: SubmissionStatus;
+  passed: number;
+  total: number;
+  cases: TestCaseResultDto[];
+  /** Whatever the solution printed, and any error output (truncated). */
+  stdout: string;
+  stderr: string;
+  durationMs: number;
+  createdAt: string;
+}
+
+export interface InterviewHistoryItemDto {
+  sessionId: string;
+  title: string;
+  problemTitle: string | null;
+  difficulty: Difficulty | null;
+  /** practice = you hosted it alone (for example with the AI interviewer). */
+  role: 'interviewer' | 'candidate' | 'practice';
+  status: 'SCHEDULED' | 'LIVE' | 'ENDED';
+  createdAt: string;
+  startedAt: string | null;
+  durationMinutes: number;
+  /** Your best test run in this interview. */
+  bestSubmission: { passed: number; total: number } | null;
+  /** Your latest AI feedback here: the average of the four scores (1-4). */
+  feedback: { average: number; recommendation: Recommendation; createdAt: string } | null;
+  /** Hosts only: your own private recommendation from the scorecard. */
+  myRecommendation: Recommendation | null;
+}
+
+export interface InterviewHistoryDto {
+  items: InterviewHistoryItemDto[];
+  stats: {
+    interviews: number;
+    asCandidate: number;
+    asInterviewer: number;
+    practice: number;
+    /** Average AI feedback score (1-4) across interviews that have feedback. */
+    averageScore: number | null;
+    /** Share of test runs (best per interview) that passed every test. */
+    solvedRate: number | null;
+  };
 }

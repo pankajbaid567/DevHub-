@@ -6,6 +6,7 @@ import {
   LayoutDashboard,
   LogOut,
   Menu,
+  Mic,
   MessageSquareText,
   Monitor,
   Moon,
@@ -135,6 +136,9 @@ function UserMenu() {
           </Link>
           <Link to={`/u/${user.username}`} className={item}>
             <User className="h-4 w-4" /> Profile
+          </Link>
+          <Link to="/interviews" className={item}>
+            <Mic className="h-4 w-4" /> My interviews
           </Link>
           <Link to={`/u/${user.username}?tab=resume`} className={item}>
             <Sparkles className="h-4 w-4" /> Resume & skills

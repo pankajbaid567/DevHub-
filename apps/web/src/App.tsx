@@ -30,6 +30,7 @@ const Sessions = lazy(() => import('./pages/sessions/SessionList'));
 const NewSession = lazy(() => import('./pages/sessions/NewSession'));
 const SessionRoom = lazy(() => import('./pages/sessions/SessionRoom'));
 const SessionReplay = lazy(() => import('./pages/sessions/SessionReplay'));
+const InterviewHistory = lazy(() => import('./pages/InterviewHistory'));
 const Mentor = lazy(() => import('./pages/Mentor'));
 const Career = lazy(() => import('./pages/Career'));
 const Profile = lazy(() => import('./pages/Profile'));
@@ -80,6 +81,7 @@ export function App() {
                 <Route path="sessions/new" element={guard(<NewSession />)} />
                 <Route path="sessions/:id" element={guard(<SessionRoom />)} />
                 <Route path="sessions/:id/replay" element={guard(<SessionReplay />)} />
+                <Route path="interviews" element={guard(<InterviewHistory />)} />
                 <Route path="mentor" element={guard(<Mentor />)} />
                 <Route path="mentor/:id" element={guard(<Mentor />)} />
                 <Route path="career" element={guard(<Career />)} />

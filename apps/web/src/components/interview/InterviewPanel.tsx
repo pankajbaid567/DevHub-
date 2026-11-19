@@ -34,6 +34,7 @@ import { Markdown } from '../Markdown';
 import { Badge } from '../ui/primitives';
 import { Button } from '../ui/Button';
 import { Textarea } from '../ui/Field';
+import { TestsPanel } from './TestsPanel';
 
 const REC_LABEL: Record<Recommendation, string> = {
   STRONG_NO: 'Strong no',
@@ -49,6 +50,7 @@ interface Props {
   isInterviewer: boolean;
   canTalk: boolean;
   getCode: () => string;
+  replaceCode: (code: string) => void;
 }
 
 /** The interview side panel: problem, clock controls, private scorecard and the AI interviewer. */
@@ -59,6 +61,7 @@ export function InterviewPanel({
   isInterviewer,
   canTalk,
   getCode,
+  replaceCode,
 }: Props) {
   const qc = useQueryClient();
   const live = session.status === 'LIVE';
@@ -144,6 +147,16 @@ export function InterviewPanel({
         </div>
       )}
 
+      {state.problem?.hasTests && state.problem.slug && (
+        <TestsPanel
+          sessionId={session.id}
+          slug={state.problem.slug}
+          sessionLanguage={session.language}
+          canSubmit={canTalk && live && !state.endedAt && Boolean(state.startedAt || isInterviewer)}
+          getCode={getCode}
+          replaceCode={replaceCode}
+        />
+      )}
       {canTalk && live && !state.endedAt && (state.startedAt || isInterviewer) && (
         <VoiceInterviewer
           sessionId={session.id}

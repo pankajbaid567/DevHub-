@@ -34,6 +34,7 @@ const noopBroadcaster: SessionBroadcaster = {
   runStarted: () => {},
   runFinished: () => {},
   interview: () => {},
+  submission: () => {},
 };
 
 export interface AppOptions {

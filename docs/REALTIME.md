@@ -44,6 +44,7 @@ Acks are `{ ok: true, data }` or `{ ok: false, code, message }`.
 | `run:started` | `{ sessionId, user, language }`: someone pressed Run (triggered by `POST /sessions/:id/runs`) |
 | `run:finished` | `CodeRunDto` (status, stdout, stderr, exit code, duration), shown to everyone in the room |
 | `interview:updated` | `InterviewStateDto`: the revealed problem, `startedAt`, `endsAt`, `endedAt` and `serverNow` (clients correct for clock skew). Never contains notes or scores |
+| `submission:finished` | `SubmissionDto`: passed and total, per-test results (input, expected and actual for visible tests; only pass/fail and any exception for hidden ones), the solution's own output |
 | `auth:expired` | Refresh the token and reconnect |
 | `rtc:peer-joined`, `rtc:peer-left` | Call membership changes |
 | `rtc:signal` | `{ sessionId, from, description? \| candidate? }` from a call member |

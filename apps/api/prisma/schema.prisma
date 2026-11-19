@@ -117,11 +117,11 @@ model User {
   votes               Vote[]
   snippets            Snippet[]
   stars               SnippetStar[]
-  hostedSessions      Session[]            @relation("SessionHost")
+  hostedSessions      Session[]             @relation("SessionHost")
   participations      SessionParticipant[]
   messages            Message[]
-  notifications       Notification[]       @relation("NotificationRecipient")
-  actedNotifications  Notification[]       @relation("NotificationActor")
+  notifications       Notification[]        @relation("NotificationRecipient")
+  actedNotifications  Notification[]        @relation("NotificationActor")
   reputationEvents    ReputationEvent[]
   skills              SkillRating[]
   mentorConversations MentorConversation[]
@@ -130,10 +130,11 @@ model User {
   oauthAccounts       OAuthAccount[]
   emailTokens         EmailToken[]
   recoveryCodes       RecoveryCode[]
-  reports             Report[]             @relation("Reporter")
-  resolvedReports     Report[]             @relation("Resolver")
-  scorecards          InterviewScorecard[] @relation("ScorecardAuthor")
+  reports             Report[]              @relation("Reporter")
+  resolvedReports     Report[]              @relation("Resolver")
+  scorecards          InterviewScorecard[]  @relation("ScorecardAuthor")
   interviewFeedback   InterviewFeedback[]
+  submissions         InterviewSubmission[]
 
   @@index([reputation(sort: Desc)])
   @@map("users")
@@ -373,7 +374,7 @@ model Session {
   interviewEndsAt    DateTime?
   interviewEndedAt   DateTime?
 
-  host         User                 @relation("SessionHost", fields: [hostId], references: [id], onDelete: Cascade)
+  host         User                  @relation("SessionHost", fields: [hostId], references: [id], onDelete: Cascade)
   participants SessionParticipant[]
   messages     Message[]
   tags         Tag[]
@@ -381,6 +382,7 @@ model Session {
   updates      SessionUpdate[]
   scorecards   InterviewScorecard[]
   feedback     InterviewFeedback[]
+  submissions  InterviewSubmission[]
 
   @@index([visibility, status, createdAt(sort: Desc)])
   @@index([hostId])
@@ -609,4 +611,29 @@ model InterviewFeedback {
   @@index([userId, createdAt(sort: Desc)])
   @@index([sessionId])
   @@map("interview_feedback")
+}
+
+/// A solution checked against a bank problem's tests (expected values never leave the server).
+model InterviewSubmission {
+  id          String   @id @default(cuid())
+  sessionId   String
+  userId      String
+  problemSlug String
+  language    String
+  code        String
+  status      String // passed | failed | error | timeout
+  passed      Int
+  total       Int
+  results     Json
+  stdout      String   @default("")
+  stderr      String   @default("")
+  durationMs  Int
+  createdAt   DateTime @default(now())
+
+  session Session @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId, createdAt(sort: Desc)])
+  @@index([userId, createdAt(sort: Desc)])
+  @@map("interview_submissions")
 }

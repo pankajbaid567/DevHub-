@@ -396,6 +396,17 @@ export default function SessionRoom() {
     () => doc?.doc.getText(DOC_TEXT).toString() ?? s?.code ?? '',
     [doc, s?.code],
   );
+  const replaceCode = useCallback(
+    (code: string) => {
+      if (!doc) return;
+      const text = doc.doc.getText(DOC_TEXT);
+      doc.doc.transact(() => {
+        text.delete(0, text.length);
+        text.insert(0, code);
+      });
+    },
+    [doc],
+  );
 
   if (isPending) return <PageSpinner label="Opening the session" />;
   if (isError) {
@@ -617,6 +628,7 @@ export default function SessionRoom() {
               isInterviewer={isHost}
               canTalk={s.myRole !== 'VIEWER'}
               getCode={getCode}
+              replaceCode={replaceCode}
             />
           ) : tab === 'chat' ? (
             <Chat sessionId={id} live={live} />

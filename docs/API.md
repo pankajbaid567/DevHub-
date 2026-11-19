@@ -42,7 +42,7 @@ Every error has the same shape:
 | Tags | `GET /tags?q` |
 | Snippets | `GET /snippets?q&language&tag&author&sort`, `POST /snippets`, `GET\|PATCH\|DELETE /snippets/:id`, `PUT\|DELETE /snippets/:id/star`, `POST /snippets/:id/fork` |
 | Sessions | `GET /sessions?scope=public\|mine&status`, `POST /sessions`, `GET /sessions/:id`, `POST /sessions/:id/{join,leave,start,end,invite-code}`, `GET\|POST /sessions/:id/messages`, `GET\|POST /sessions/:id/runs` (sandboxed code execution), `GET /sessions/:id/replay?after&limit` (edit log for replay) |
-| Interviews | `GET /sessions/interview/problems`, `POST /sessions/:id/interview` (start, extend or end the clock; interviewer only), `GET\|PUT /sessions/:id/interview/scorecard` (private to the interviewer), `POST /sessions/:id/interview/voice-token` (single-use Gemini Live token), `GET\|POST /sessions/:id/interview/feedback` |
+| Interviews | `GET /sessions/interview/problems`, `POST /sessions/:id/interview` (start, extend or end the clock; interviewer only), `GET\|PUT /sessions/:id/interview/scorecard` (private to the interviewer), `POST /sessions/:id/interview/voice-token` (single-use Gemini Live token), `GET\|POST /sessions/:id/interview/feedback`, `GET\|POST /sessions/:id/interview/submissions` (run the problem's visible and hidden tests), `GET /sessions/interview/history` (your interviews, results and stats) |
 | Users | `GET /users/leaderboard`, `GET /users/me/dashboard`, `PATCH /users/me`, `GET\|PUT /users/me/skills`, `GET /users/:username` |
 | Moderation | `POST /reports`; admin only: `GET /admin/moderation`, `POST /admin/moderation/resolve` |
 | Notifications | `GET /notifications`, `POST /notifications/read` |

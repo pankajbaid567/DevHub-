@@ -57,12 +57,16 @@ export class RunsService {
     return this.runner.enabled;
   }
 
-  async run(
+  /**
+   * Runs `fn` holding the session's run slot, after the shared checks: editors only, live
+   * sessions only, the runner configured, a per-user cooldown and one execution per session at
+   * a time (a Redis lock, so it holds across replicas). Test submissions use it too.
+   */
+  async exclusive<T>(
     user: AuthUser,
     sessionId: string,
-    input: RunCodeInput,
-    broadcast: RunBroadcaster,
-  ): Promise<CodeRunDto> {
+    fn: (author: CodeRunDto['user']) => Promise<T>,
+  ): Promise<T> {
     const { role, status } = await this.sessions.requireParticipant(user, sessionId);
     if (status !== 'LIVE')
       throw new AppError(409, ErrorCode.SESSION_NOT_LIVE, 'Code can only run in a live session');
@@ -79,37 +83,50 @@ export class RunsService {
     const lock = `run:lock:${sessionId}`;
     if (!(await this.cache.setIfAbsent(lock, LOCK_TTL_S)))
       throw new AppError(409, ErrorCode.CONFLICT, 'Code is already running in this session');
-
     try {
       const author = await this.db.user.findUniqueOrThrow({
         where: { id: user.id },
         select: userSummarySelect,
       });
-      broadcast.runStarted(sessionId, toUserSummary(author), input.language);
+      return await fn(toUserSummary(author));
+    } finally {
+      await this.cache.del(lock);
+    }
+  }
 
-      let result: Omit<
-        Prisma.CodeRunUncheckedCreateInput,
-        'sessionId' | 'userId' | 'language' | 'code'
-      >;
-      try {
-        const r = await this.runner.run(input);
-        result = {
-          status: r.status,
-          stdout: r.stdout,
-          stderr: r.stderr,
-          exitCode: r.exitCode,
-          durationMs: r.durationMs,
-        };
-      } catch (err) {
-        this.logger.warn({ err: (err as Error).message, sessionId }, 'code run failed');
-        result = {
-          status: 'failed',
-          stdout: '',
-          stderr: (err as Error).message,
-          exitCode: null,
-          durationMs: 0,
-        };
-      }
+  /** Executes code in the sandbox; runner outages come back as a `failed` result. */
+  async execute(input: RunCodeInput): Promise<{
+    status: CodeRunDto['status'];
+    stdout: string;
+    stderr: string;
+    exitCode: number | null;
+    durationMs: number;
+  }> {
+    try {
+      // Pick the fields: the runner's response carries more (e.g. `signal`) than we store.
+      const { status, stdout, stderr, exitCode, durationMs } = await this.runner.run(input);
+      return { status, stdout, stderr, exitCode, durationMs };
+    } catch (err) {
+      this.logger.warn({ err: (err as Error).message }, 'code run failed');
+      return {
+        status: 'failed',
+        stdout: '',
+        stderr: (err as Error).message,
+        exitCode: null,
+        durationMs: 0,
+      };
+    }
+  }
+
+  async run(
+    user: AuthUser,
+    sessionId: string,
+    input: RunCodeInput,
+    broadcast: RunBroadcaster,
+  ): Promise<CodeRunDto> {
+    return this.exclusive(user, sessionId, async (author) => {
+      broadcast.runStarted(sessionId, author, input.language);
+      const result = await this.execute(input);
       const row = await this.db.codeRun.create({
         data: {
           sessionId,
@@ -124,9 +141,7 @@ export class RunsService {
       const dto = toDto(row);
       broadcast.runFinished(dto);
       return dto;
-    } finally {
-      await this.cache.del(lock);
-    }
+    });
   }
 
   async history(user: AuthUser, sessionId: string, limit = 10): Promise<CodeRunDto[]> {

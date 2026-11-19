@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { CodeRunDto, TranscriptEntry, VoiceTokenDto } from '@devhub/shared';
+import type { CodeRunDto, SubmissionDto, TranscriptEntry, VoiceTokenDto } from '@devhub/shared';
 import { api, errorMessage } from './api';
 import { getSocket } from './socket';
 import { decodeModelAudio, encodeMicFrame, INPUT_RATE, OUTPUT_RATE, rms } from './audio';
@@ -226,6 +226,23 @@ export function useVoiceInterviewer({ sessionId, getCode, endsAt, clockOffsetMs 
       };
       socket.on('run:finished', onRun);
       disposers.push(() => socket.off('run:finished', onRun));
+      const onTests = (t: SubmissionDto) => {
+        if (t.sessionId !== sessionId) return;
+        const failed = t.cases.filter((c) => !c.passed);
+        const detail = failed
+          .slice(0, 2)
+          .map((c) =>
+            c.hidden
+              ? `a hidden test${c.error ? ` (${c.error})` : ''}`
+              : `${c.input} expected ${c.expected} got ${c.actual ?? c.error}`,
+          )
+          .join('; ');
+        send(
+          `[tests] ${t.passed}/${t.total} passed (${t.status})${detail ? `. Failing: ${detail}` : ''}`,
+        );
+      };
+      socket.on('submission:finished', onTests);
+      disposers.push(() => socket.off('submission:finished', onTests));
 
       if (endsAt) {
         const warnAt = Date.parse(endsAt) - 5 * 60_000 - (Date.now() + clockOffsetMs);

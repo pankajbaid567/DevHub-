@@ -3,6 +3,7 @@ import { Gauge } from '../lib/metrics.js';
 import { SessionRecorder } from './recorder.js';
 import type { RunBroadcaster } from '../modules/runs/runs.service.js';
 import type { InterviewBroadcaster } from '../modules/interviews/interview.service.js';
+import type { SubmissionBroadcaster } from '../modules/interviews/submissions.service.js';
 import { Server, type Socket } from 'socket.io';
 import { createAdapter } from '@socket.io/redis-adapter';
 import {
@@ -49,7 +50,8 @@ type ClientSocket = Socket<
   SocketData
 >;
 
-export interface SessionBroadcaster extends RunBroadcaster, InterviewBroadcaster {
+export interface SessionBroadcaster
+  extends RunBroadcaster, InterviewBroadcaster, SubmissionBroadcaster {
   status(sessionId: string, status: SessionStatus): void;
   message(m: ChatMessageDto): void;
 }
@@ -392,6 +394,9 @@ export function attachRealtime(httpServer: HttpServer, c: Container) {
     },
     interview(state) {
       io.to(room(state.sessionId)).emit('interview:updated', state);
+    },
+    submission(sub) {
+      io.to(room(sub.sessionId)).emit('submission:finished', sub);
     },
   };
 

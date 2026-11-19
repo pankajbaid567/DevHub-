@@ -30,6 +30,7 @@ import { LogMailer, SmtpMailer, type Mailer } from './jobs/mailer.js';
 import { createHandlers } from './jobs/handlers.js';
 import { RunsService } from './modules/runs/runs.service.js';
 import { InterviewService } from './modules/interviews/interview.service.js';
+import { SubmissionsService } from './modules/interviews/submissions.service.js';
 import {
   DisabledLiveTokenIssuer,
   GeminiLiveTokenIssuer,
@@ -72,6 +73,7 @@ export interface Container {
   twoFactor: TwoFactorService;
   moderation: ModerationService;
   interviews: InterviewService;
+  submissions: SubmissionsService;
 }
 
 export interface ContainerOverrides {
@@ -165,6 +167,7 @@ export function createContainer(env: Env, overrides: ContainerOverrides = {}): C
       ? new GeminiLiveTokenIssuer(env.GEMINI_API_KEY!, env.GEMINI_LIVE_MODEL, env.GEMINI_LIVE_VOICE)
       : new DisabledLiveTokenIssuer());
 
+  const runs = new RunsService(db, cache, sessions, codeRunner, logger);
   const ai = new AiService(db, aiProvider, logger, metrics, (text) => search.retrieve(text));
   const questions = new QuestionsService(db, cache, events, reputation);
   const snippets = new SnippetsService(db, events);
@@ -212,7 +215,8 @@ export function createContainer(env: Env, overrides: ContainerOverrides = {}): C
     ),
     indexer,
     search,
-    runs: new RunsService(db, cache, sessions, codeRunner, logger),
+    runs,
+    submissions: new SubmissionsService(db, sessions, runs),
     interviews: new InterviewService(db, sessions, ai, liveTokens, cache, logger),
   };
 }

@@ -299,3 +299,39 @@ test('mock interview: the problem stays hidden until the clock starts, notes sta
   await interviewer.getByRole('button', { name: 'End interview' }).click();
   await expect(candidate.getByRole('timer')).toHaveText('Ended');
 });
+
+test('practice: starter code runs against hidden tests, and the result shows in the history', async ({
+  page,
+  request,
+}) => {
+  const status = await request.get('/api/v1/sessions?limit=1');
+  test.skip(!status.ok(), 'API not reachable');
+  await signUp(page);
+  await page.goto('/sessions/new?mode=interview');
+  const title = `Practice ${Date.now()}`;
+  await page.getByLabel('Title').fill(title);
+  await page.getByRole('radio', { name: /Merge Intervals/ }).click();
+  await page.getByRole('button', { name: 'Go live' }).click();
+  await expect(page.locator('.monaco-editor')).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByRole('tab', { name: 'People (1)' })).toBeVisible();
+
+  await page.getByLabel('Test language').selectOption('javascript');
+  await page.getByRole('button', { name: 'Use starter code' }).click();
+  await expect(page.locator('.view-lines')).toContainText('function merge(intervals)');
+  await page.getByRole('button', { name: 'Run tests' }).click();
+  const results = page.getByRole('list', { name: 'Test results' });
+  await expect(results).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByText('Some tests failed')).toBeVisible();
+  await expect(results.getByText('Example 1')).toBeVisible();
+  await expect(results.getByText(/Hidden test \d/).first()).toBeVisible();
+  await expect(results.getByText('Expected').first()).toBeVisible(); // visible tests show the data
+
+  await page.getByRole('button', { name: 'Account menu' }).click();
+  await page.getByRole('link', { name: 'My interviews' }).click();
+  await expect(page.getByRole('heading', { name: 'Your interviews' })).toBeVisible();
+  const row = page.getByRole('listitem').filter({ hasText: title });
+  await expect(row.getByText('Practice', { exact: true })).toBeVisible();
+  await expect(row.getByText('0/6')).toBeVisible();
+  await row.getByRole('link', { name: `Replay ${title}` }).click();
+  await expect(page).toHaveURL(/\/replay$/);
+});

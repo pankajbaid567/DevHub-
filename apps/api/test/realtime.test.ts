@@ -25,6 +25,7 @@ const runner = {
       stderr: '',
       exitCode: 0,
       durationMs: 12,
+      signal: null, // the real runner returns extra fields; they must not reach the database
     };
   },
 };
@@ -38,6 +39,7 @@ const { app } = createApp(c, {
     runStarted: (i, u, l) => lazy.rt?.broadcaster.runStarted(i, u, l),
     runFinished: (r) => lazy.rt?.broadcaster.runFinished(r),
     interview: (s) => lazy.rt?.broadcaster.interview(s),
+    submission: (s) => lazy.rt?.broadcaster.submission(s),
   },
 });
 const server = http.createServer(app);

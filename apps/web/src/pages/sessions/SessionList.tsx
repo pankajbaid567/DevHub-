@@ -114,6 +114,11 @@ export default function SessionList() {
               ]}
             />
           )}
+          {status === 'authenticated' && (
+            <ButtonLink to="/interviews" variant="ghost">
+              My interviews
+            </ButtonLink>
+          )}
           <ButtonLink to="/sessions/new?mode=interview" variant="outline">
             Mock interview
           </ButtonLink>

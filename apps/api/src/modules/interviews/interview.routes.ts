@@ -4,6 +4,7 @@ import {
   interviewFeedbackRequestSchema,
   INTERVIEW_PROBLEMS,
   scorecardSchema,
+  submitSolutionSchema,
 } from '@devhub/shared';
 import type { Container } from '../../container.js';
 import { defineRoute, type RouteContext } from '../../core/route.js';
@@ -24,6 +25,57 @@ export function interviewRoutes(
     auth: 'optional',
     handler: async (_req, res) => {
       res.json({ items: INTERVIEW_PROBLEMS, voiceEnabled: c.interviews.voiceEnabled });
+    },
+  });
+
+  defineRoute(ctx, {
+    method: 'get',
+    path: '/interview/history',
+    tag: 'Interviews',
+    summary: 'Every interview you took part in, with your own test results and feedback',
+    auth: 'required',
+    handler: async (req, res) => {
+      res.json(await c.submissions.history(currentUser(req)));
+    },
+  });
+
+  defineRoute(ctx, {
+    method: 'post',
+    path: '/:id/interview/submissions',
+    tag: 'Interviews',
+    summary:
+      "Check a solution against the problem's visible and hidden tests (shared with the room)",
+    auth: 'required',
+    params: idParamSchema,
+    body: submitSolutionSchema,
+    responses: {
+      201: 'Results',
+      409: 'No tests, not started, or already running',
+      429: 'Cooldown',
+    },
+    handler: async (req, res) => {
+      res
+        .status(201)
+        .json(
+          await c.submissions.submit(
+            currentUser(req),
+            req.params.id as string,
+            req.body,
+            broadcast,
+          ),
+        );
+    },
+  });
+
+  defineRoute(ctx, {
+    method: 'get',
+    path: '/:id/interview/submissions',
+    tag: 'Interviews',
+    summary: "The room's recent test submissions",
+    auth: 'required',
+    params: idParamSchema,
+    handler: async (req, res) => {
+      res.json({ items: await c.submissions.list(currentUser(req), req.params.id as string) });
     },
   });
 

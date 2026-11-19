@@ -1,4 +1,5 @@
 import { findProblem, type InterviewStateDto } from '@devhub/shared';
+import { hasTests } from './problem-tests.js';
 
 /** The interview columns of a session row. */
 export interface InterviewColumns {
@@ -43,6 +44,8 @@ export function interviewState(
             title: s.problemTitle,
             statement: s.problemStatement ?? '',
             difficulty: (s.problemSlug && findProblem(s.problemSlug)?.difficulty) || null,
+            slug: s.problemSlug,
+            hasTests: hasTests(s.problemSlug),
           }
         : null,
     problemHidden: !revealed,
