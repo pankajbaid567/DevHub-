@@ -1,4 +1,4 @@
-import type { NotificationType, Prisma } from '@prisma/client';
+import type { NotificationType, Prisma } from '../../generated/prisma/client.js';
 import type { CursorPage, CursorQuery, NotificationDto } from '@devhub/shared';
 import type { Db } from '../../lib/prisma.js';
 import type { EventBus } from '../../core/events.js';

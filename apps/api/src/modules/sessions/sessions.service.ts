@@ -1,6 +1,6 @@
 import { randomBytes } from 'node:crypto';
 import * as Y from 'yjs';
-import { type Prisma } from '@prisma/client';
+import { type Prisma } from '../../generated/prisma/client.js';
 import { createSessionSchema, DOC_TEXT, ErrorCode } from '@devhub/shared';
 import type {
   ReplayPageDto,

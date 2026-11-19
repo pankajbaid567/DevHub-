@@ -17,7 +17,7 @@ import {
   type ResumeReviewResult,
   type SkillAssessmentResult,
 } from '@devhub/shared';
-import type { Prisma } from '@prisma/client';
+import type { Prisma } from '../../generated/prisma/client.js';
 import type { Db } from '../../lib/prisma.js';
 import type { Logger } from '../../lib/logger.js';
 import type { MetricsRegistry } from '../../lib/metrics.js';

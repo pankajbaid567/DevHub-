@@ -3,8 +3,8 @@
 # Prisma cannot express pgvector HNSW indexes, so the diff always proposes dropping them;
 # those (and only those) lines are allowed.
 set -eu
-diff=$(npx prisma migrate diff --from-schema-datasource prisma/schema.prisma \
-  --to-schema-datamodel prisma/schema.prisma --script 2>/dev/null)
+# No 2>/dev/null: if the diff itself fails (bad flags, no database), set -e stops with its error.
+diff=$(npx prisma migrate diff --from-config-datasource --to-schema prisma/schema.prisma --script)
 unexpected=$(printf '%s\n' "$diff" | grep -v '^--' | grep -v '^\s*$' | grep -v '_hnsw"' || true)
 if [ -n "$unexpected" ]; then
   echo "Schema drift: migrations do not match schema.prisma:"

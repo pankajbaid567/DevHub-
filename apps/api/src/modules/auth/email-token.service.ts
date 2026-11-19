@@ -1,5 +1,5 @@
 import { createHash, randomBytes } from 'node:crypto';
-import type { EmailTokenPurpose } from '@prisma/client';
+import type { EmailTokenPurpose } from '../../generated/prisma/client.js';
 import type { Tx } from '../../lib/prisma.js';
 
 const sha256 = (s: string) => createHash('sha256').update(s).digest('hex');

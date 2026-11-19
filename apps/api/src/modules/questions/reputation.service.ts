@@ -1,4 +1,4 @@
-import type { ReputationReason } from '@prisma/client';
+import type { ReputationReason } from '../../generated/prisma/client.js';
 import type { Tx } from '../../lib/prisma.js';
 
 /**

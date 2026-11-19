@@ -14,7 +14,7 @@ const envSchema = z
       .default('info'),
 
     DATABASE_URL: z.string().url(),
-    /** Connections per process (ignored if DATABASE_URL sets connection_limit). */
+    /** Connections per process (a connection_limit in DATABASE_URL wins). */
     DB_POOL_SIZE: z.coerce.number().int().min(2).max(100).default(10),
     /** Optional. Without Redis the app runs single-instance with in-memory cache/limits. */
     REDIS_URL: z.string().url().optional(),

@@ -1,21 +1,33 @@
-import { PrismaClient } from '@prisma/client';
+import { PrismaPg } from '@prisma/adapter-pg';
+import type { PoolConfig } from 'pg';
+import { PrismaClient } from '../generated/prisma/client.js';
 import { env } from '../config/env.js';
 import { logger } from './logger.js';
 
 /**
- * Sets an explicit pool size unless the URL already has one. Prisma's default (2 x CPUs + 1)
- * is only 5 connections on a 2-vCPU container, which background jobs plus requests can
- * exhaust (found when CI, on 2 cores, stalled real-time notifications).
+ * Pool settings for the pg driver adapter (Prisma 7 talks to Postgres through node-postgres).
+ * The size is explicit: a small default is easy to exhaust with background jobs plus requests
+ * (found when CI, on 2 cores, stalled real-time notifications). `connection_limit` in the URL
+ * still wins, so existing deployment URLs keep working.
  */
-export function withPoolSize(url: string, size: number): string {
-  if (/[?&]connection_limit=/.test(url)) return url;
-  return `${url}${url.includes('?') ? '&' : '?'}connection_limit=${size}&pool_timeout=20`;
+export function poolConfig(url: string, size: number): PoolConfig {
+  const parsed = new URL(url);
+  const limit = Number(parsed.searchParams.get('connection_limit')) || size;
+  for (const p of ['connection_limit', 'pool_timeout', 'schema']) parsed.searchParams.delete(p);
+  return {
+    connectionString: parsed.toString(),
+    max: limit,
+    connectionTimeoutMillis: 20_000,
+    idleTimeoutMillis: 30_000,
+  };
 }
 
-/** One client per process; Prisma pools connections internally. */
+/** One client per process; the adapter's pg.Pool holds the connections. */
 export function createPrisma(): PrismaClient {
   const prisma = new PrismaClient({
-    datasourceUrl: withPoolSize(env.DATABASE_URL, env.DB_POOL_SIZE),
+    adapter: new PrismaPg(poolConfig(env.DATABASE_URL, env.DB_POOL_SIZE), {
+      schema: new URL(env.DATABASE_URL).searchParams.get('schema') ?? undefined,
+    }),
     transactionOptions: { maxWait: 5_000, timeout: 10_000 },
     log: env.isProd
       ? [{ emit: 'event', level: 'warn' }]

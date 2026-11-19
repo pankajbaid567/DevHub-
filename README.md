@@ -149,7 +149,7 @@ There's much more in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md): the data mode
 | Layer | Choices |
 |---|---|
 | **Web** | React 19, TypeScript (strict), Vite, Tailwind CSS 4, TanStack Query, React Router 7, react-hook-form + zod, Monaco, Yjs (`y-monaco`), Socket.IO client, react-markdown + rehype-sanitize |
-| **API** | Node.js 20, Express 5, TypeScript (strict), Prisma 6, PostgreSQL 16 + pgvector, Socket.IO 4 + Redis adapter, ioredis, BullMQ, Nodemailer, Yjs, zod, Pino, `@google/genai` (chat + embeddings), zod-to-openapi + Swagger UI |
+| **API** | Node.js 20, Express 5, TypeScript (strict), Prisma 7 (pg driver adapter), PostgreSQL 16 + pgvector, Socket.IO 4 + Redis adapter, ioredis, BullMQ, Nodemailer, Yjs, zod, Pino, `@google/genai` (chat + embeddings), zod-to-openapi + Swagger UI |
 | **Quality** | k6 (load and stress), Vitest, Supertest, Socket.IO client tests, React Testing Library, Playwright, axe-core, ESLint (typescript-eslint, React hooks), Prettier |
 | **Infrastructure** | Docker (multi-stage, non-root), Docker Compose, Kubernetes (Kustomize, kind), nginx, Prometheus, Grafana, Mailpit, GitHub Actions |
 

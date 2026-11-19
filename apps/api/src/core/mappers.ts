@@ -1,5 +1,5 @@
 import type { PageMeta, UserSummary } from '@devhub/shared';
-import type { Prisma } from '@prisma/client';
+import type { Prisma } from '../generated/prisma/client.js';
 
 /** The only user columns ever embedded in other resources: never the email or hash. */
 export const userSummarySelect = {

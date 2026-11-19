@@ -1,4 +1,4 @@
-import { Prisma } from '@prisma/client';
+import { Prisma } from '../generated/prisma/client.js';
 
 /**
  * Retries a transaction on serialization failures (P2034) and unique-constraint races
@@ -20,6 +20,24 @@ export async function withRetry<T>(fn: () => Promise<T>, attempts = 3): Promise<
 
 export const isUniqueViolation = (err: unknown): boolean =>
   err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002';
+
+/**
+ * The constraint behind a unique violation, e.g. "users_username_key". With driver adapters
+ * (Prisma 7) the details live in meta.driverAdapterError instead of meta.target.
+ */
+export function uniqueTarget(err: unknown): string {
+  if (!isUniqueViolation(err)) return '';
+  const meta = (err as Prisma.PrismaClientKnownRequestError).meta as
+    | {
+        target?: string | string[];
+        driverAdapterError?: {
+          cause?: { constraint?: { index?: string; fields?: string[] } };
+        };
+      }
+    | undefined;
+  const c = meta?.driverAdapterError?.cause?.constraint;
+  return String(c?.fields?.join(',') ?? c?.index ?? meta?.target ?? '');
+}
 
 export const isNotFound = (err: unknown): boolean =>
   err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2025';

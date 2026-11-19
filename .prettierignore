@@ -5,3 +5,4 @@ package-lock.json
 *.md
 apps/api/prisma/migrations
 playwright-report
+apps/api/src/generated

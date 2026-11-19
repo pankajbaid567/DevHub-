@@ -8,4 +8,7 @@ export default defineConfig({
     path: path.join('prisma', 'migrations'),
     seed: 'tsx src/seed.ts',
   },
+  // `prisma generate` (e.g. in the Docker build) needs no database, so the URL is optional here;
+  // migrate commands fail with a clear error if it is missing.
+  datasource: { url: process.env.DATABASE_URL ?? '' },
 });

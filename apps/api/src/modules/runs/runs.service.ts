@@ -4,7 +4,7 @@ import {
   type RunCodeInput,
   type RunnableLanguage,
 } from '@devhub/shared';
-import type { Prisma } from '@prisma/client';
+import type { Prisma } from '../../generated/prisma/client.js';
 import type { Db } from '../../lib/prisma.js';
 import type { Cache } from '../../lib/cache.js';
 import type { Logger } from '../../lib/logger.js';

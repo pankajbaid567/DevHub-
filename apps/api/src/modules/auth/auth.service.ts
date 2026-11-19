@@ -1,5 +1,6 @@
 import bcrypt from 'bcryptjs';
-import { Prisma } from '@prisma/client';
+import { Prisma } from '../../generated/prisma/client.js';
+import { uniqueTarget } from '../../core/tx.js';
 import type {
   ChangePasswordInput,
   CurrentUser,
@@ -132,7 +133,7 @@ export class AuthService {
     } catch (err) {
       // Rely on the unique indexes instead of a racy "check then insert".
       if (isUnique(err)) {
-        const field = String((err.meta?.target as string[] | undefined)?.[0] ?? 'account');
+        const field = uniqueTarget(err).includes('username') ? 'username' : 'email';
         throw new ConflictError(
           field === 'username'
             ? 'That username is taken'
@@ -343,7 +344,7 @@ export class AuthService {
         });
         return u.id;
       } catch (err) {
-        const target = isUnique(err) ? String(err.meta?.target ?? '') : '';
+        const target = uniqueTarget(err);
         if (!target.includes('username')) throw err;
       }
     }

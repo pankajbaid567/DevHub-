@@ -1,4 +1,4 @@
-import type { Prisma } from '@prisma/client';
+import type { Prisma } from '../generated/prisma/client.js';
 import type { Db, Tx } from '../lib/prisma.js';
 import type { Logger } from '../lib/logger.js';
 import type { JobName, JobPayloads, JobQueue } from './queue.js';

@@ -31,7 +31,6 @@ FROM base AS runtime
 ENV NODE_ENV=production PORT=4000
 # --chown on COPY sets ownership without a recursive chown layer (which would duplicate ~300 MB).
 COPY --chown=node:node --from=prod-deps /app/node_modules ./node_modules
-COPY --chown=node:node --from=build /app/node_modules/.prisma ./node_modules/.prisma
 COPY --chown=node:node --from=build /app/packages/shared/package.json packages/shared/package.json
 COPY --chown=node:node --from=build /app/packages/shared/dist packages/shared/dist
 COPY --chown=node:node --from=build /app/apps/api/package.json apps/api/package.json

@@ -120,7 +120,8 @@ export async function resetDb(c: Container): Promise<void> {
       );
       return;
     } catch (err) {
-      const deadlock = String((err as Error).message).includes('40P01');
+      const detail = `${(err as Error).message} ${JSON.stringify((err as { meta?: unknown }).meta ?? {})}`;
+      const deadlock = /40P01|deadlock/i.test(detail);
       if (!deadlock || attempt >= 5) throw err;
       await new Promise((r) => setTimeout(r, 50 * attempt));
     }
