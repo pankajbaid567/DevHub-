@@ -135,6 +135,29 @@ describe('transactional outbox', () => {
     expect(mailer.sent.map((m) => m.to)).toEqual(['lease@example.com']);
   });
 
+  it('flush waits for a relay pass that is already in flight', async () => {
+    await c.db.outboxEvent.create({
+      data: {
+        topic: 'email.send',
+        payload: { to: 'inflight@example.com', subject: 's', text: 't', html: 'h' },
+      },
+    });
+    // A relay whose enqueue is slow, so the background pass is caught between claim and enqueue.
+    const slowQueue = {
+      ...c.queue,
+      add: async (...args: Parameters<typeof c.queue.add>) => {
+        await new Promise((r) => setTimeout(r, 300));
+        return c.queue.add(...args);
+      },
+    };
+    const relay = new Outbox(c.db, slowQueue as never, c.logger);
+    relay.poke(); // a background pass claims the row…
+    await new Promise((r) => setTimeout(r, 100));
+    await relay.flush(); // …and flushing must not return before it has enqueued it
+    await settle(c);
+    expect(mailer.sent.map((m) => m.to)).toEqual(['inflight@example.com']);
+  });
+
   it('rejects job ids BullMQ would reject, in tests too', async () => {
     await expect(c.queue.add('search.reconcile', {}, { jobId: 'a:b' })).rejects.toThrow(/':'/);
   });

@@ -104,10 +104,16 @@ export class Outbox {
   }
 
   /** Relays until the table has nothing due (used by tests and on shutdown). */
+  /**
+   * Relays everything due, including rows a background pass (`poke`) has already claimed:
+   * otherwise flush could find nothing to claim and return before that pass enqueued them.
+   */
   async flush(): Promise<void> {
+    await this.running;
     while ((await this.relayOnce()) > 0) {
       /* keep going */
     }
+    await this.running;
   }
 
   /**
