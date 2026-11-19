@@ -20,4 +20,4 @@ test-results/
 .idea/
 *.log
 loadtest/results/
-src/generated/
+apps/api/src/generated/
