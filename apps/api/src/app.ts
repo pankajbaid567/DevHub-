@@ -19,6 +19,7 @@ import { authRoutes } from './modules/auth/auth.routes.js';
 import { answerRoutes, questionRoutes, tagRoutes } from './modules/questions/questions.routes.js';
 import { snippetRoutes } from './modules/snippets/snippets.routes.js';
 import { sessionRoutes } from './modules/sessions/sessions.routes.js';
+import { interviewRoutes } from './modules/interviews/interview.routes.js';
 import { notificationRoutes, userRoutes } from './modules/users/users.routes.js';
 import { aiRoutes } from './modules/ai/ai.routes.js';
 import { searchRoutes } from './modules/search/search.routes.js';
@@ -32,6 +33,7 @@ const noopBroadcaster: SessionBroadcaster = {
   message: () => {},
   runStarted: () => {},
   runFinished: () => {},
+  interview: () => {},
 };
 
 export interface AppOptions {
@@ -132,7 +134,10 @@ export function createApp(
   mount('/answers', (ctx) => answerRoutes(ctx, c));
   mount('/tags', (ctx) => tagRoutes(ctx, c));
   mount('/snippets', (ctx) => snippetRoutes(ctx, c));
-  mount('/sessions', (ctx) => sessionRoutes(ctx, c, broadcaster));
+  mount('/sessions', (ctx) => {
+    sessionRoutes(ctx, c, broadcaster);
+    interviewRoutes(ctx, c, broadcaster);
+  });
   mount('/users', (ctx) => userRoutes(ctx, c));
   mount('/notifications', (ctx) => notificationRoutes(ctx, c));
   mount('/ai', (ctx) => aiRoutes(ctx, c, limiters.ai));

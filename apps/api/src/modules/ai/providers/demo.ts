@@ -132,6 +132,25 @@ function demoJson(schema: Record<string, unknown>, input: string): unknown {
       reason: 'No spam or abuse signals found (demo heuristic).',
     };
   }
+  if ('recommendation' in props && 'scores' in props) {
+    const turns = (input.match(/^(candidate|interviewer):/gim) ?? []).length;
+    const talked = (input.match(/^candidate:/gim) ?? []).length;
+    const score = talked >= 4 ? 3 : 2;
+    return {
+      scores: { problemSolving: score, codeQuality: 2, communication: score, testing: 2 },
+      strengths: [
+        talked >= 4
+          ? 'You kept talking through your thinking across the conversation.'
+          : 'You engaged with the problem.',
+      ],
+      improvements: [
+        'State the time and space complexity before you start coding.',
+        'Walk through an edge case (empty input, duplicates) out loud before finishing.',
+      ],
+      summary: `Demo feedback (no AI key configured), based on ${turns} transcript turns. Set GEMINI_API_KEY for a real review.`,
+      recommendation: talked >= 4 ? 'YES' : 'NO',
+    };
+  }
   if ('roadmap' in props) {
     return {
       level: 'intermediate',

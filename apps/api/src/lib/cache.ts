@@ -10,6 +10,8 @@ export interface Cache {
   del(...keys: string[]): Promise<void>;
   /** Sets the key only if absent. Returns true if this call created it (for de-duplication). */
   setIfAbsent(key: string, ttlSeconds: number): Promise<boolean>;
+  /** Atomically increments a counter; the TTL starts with the first increment (a fixed window). */
+  incr(key: string, ttlSeconds: number): Promise<number>;
 }
 
 export class RedisCache implements Cache {
@@ -33,6 +35,14 @@ export class RedisCache implements Cache {
 
   async setIfAbsent(key: string, ttlSeconds: number): Promise<boolean> {
     return (await this.redis.set(this.prefix + key, '1', 'EX', ttlSeconds, 'NX')) === 'OK';
+  }
+
+  async incr(key: string, ttlSeconds: number): Promise<number> {
+    const k = this.prefix + key;
+    const [[, n]] = (await this.redis.multi().incr(k).expire(k, ttlSeconds, 'NX').exec()) as [
+      [Error | null, number],
+    ];
+    return n;
   }
 }
 
@@ -76,6 +86,16 @@ export class MemoryCache implements Cache {
     if (this.live(key)) return false;
     await this.set(key, 1, ttlSeconds);
     return true;
+  }
+
+  async incr(key: string, ttlSeconds: number): Promise<number> {
+    const hit = this.live(key);
+    const n = (hit ? Number(JSON.parse(hit.value)) : 0) + 1;
+    this.store.set(key, {
+      value: JSON.stringify(n),
+      expiresAt: hit?.expiresAt ?? Date.now() + ttlSeconds * 1000,
+    });
+    return n;
   }
 }
 

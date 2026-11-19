@@ -1,6 +1,7 @@
 import type { ChatMessageDto, CodeRunDto, ParticipantRole, SessionStatus } from './sessions.js';
 import type { NotificationDto } from './notifications.js';
 import type { UserSummary } from './common.js';
+import type { InterviewStateDto } from './interview.js';
 
 /**
  * Typed Socket.IO contract. Both the server (`Server<ClientToServer, ServerToClient>`)
@@ -83,6 +84,7 @@ export interface ServerToClientEvents {
   /** Someone pressed Run: everyone's output panel shows it is running. */
   'run:started': (p: { sessionId: string; user: UserSummary; language: string }) => void;
   'run:finished': (r: CodeRunDto) => void;
+  'interview:updated': (s: InterviewStateDto) => void;
   'rtc:peer-joined': (p: { sessionId: string; peer: RtcPeer }) => void;
   'rtc:peer-left': (p: { sessionId: string; socketId: string }) => void;
   'rtc:signal': (p: RtcSignal & { from: string }) => void;

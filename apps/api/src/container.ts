@@ -29,6 +29,12 @@ import { Outbox } from './jobs/outbox.js';
 import { LogMailer, SmtpMailer, type Mailer } from './jobs/mailer.js';
 import { createHandlers } from './jobs/handlers.js';
 import { RunsService } from './modules/runs/runs.service.js';
+import { InterviewService } from './modules/interviews/interview.service.js';
+import {
+  DisabledLiveTokenIssuer,
+  GeminiLiveTokenIssuer,
+  type LiveTokenIssuer,
+} from './modules/interviews/live-token.js';
 import {
   DisabledCodeRunner,
   HttpCodeRunner,
@@ -65,6 +71,7 @@ export interface Container {
   runs: RunsService;
   twoFactor: TwoFactorService;
   moderation: ModerationService;
+  interviews: InterviewService;
 }
 
 export interface ContainerOverrides {
@@ -77,6 +84,7 @@ export interface ContainerOverrides {
   oauthFetch?: typeof fetch;
   oauthConfigs?: Env['oauth'];
   codeRunner?: CodeRunner;
+  liveTokens?: LiveTokenIssuer;
   /** Retry delay for the in-process queue (tests use 0). */
   inlineRetryDelay?: (attempt: number) => number;
 }
@@ -151,6 +159,12 @@ export function createContainer(env: Env, overrides: ContainerOverrides = {}): C
       ? new HttpCodeRunner(env.CODE_RUNNER_URL, env.RUNNER_TOKEN)
       : new DisabledCodeRunner());
 
+  const liveTokens: LiveTokenIssuer =
+    overrides.liveTokens ??
+    (env.aiEnabled && env.VOICE_INTERVIEWER
+      ? new GeminiLiveTokenIssuer(env.GEMINI_API_KEY!, env.GEMINI_LIVE_MODEL, env.GEMINI_LIVE_VOICE)
+      : new DisabledLiveTokenIssuer());
+
   const ai = new AiService(db, aiProvider, logger, metrics, (text) => search.retrieve(text));
   const questions = new QuestionsService(db, cache, events, reputation);
   const snippets = new SnippetsService(db, events);
@@ -199,5 +213,6 @@ export function createContainer(env: Env, overrides: ContainerOverrides = {}): C
     indexer,
     search,
     runs: new RunsService(db, cache, sessions, codeRunner, logger),
+    interviews: new InterviewService(db, sessions, ai, liveTokens, cache, logger),
   };
 }

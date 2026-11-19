@@ -1,11 +1,18 @@
 import { useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useNavigate } from 'react-router-dom';
-import { useMutation } from '@tanstack/react-query';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useMutation, useQuery } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import type { z } from 'zod';
-import { createSessionSchema, LANGUAGES, type SessionDto } from '@devhub/shared';
+import {
+  createSessionSchema,
+  interviewSetupSchema,
+  LANGUAGES,
+  type SessionDto,
+} from '@devhub/shared';
+import { problemsQuery } from '../../lib/interview';
+import { cn } from '../../lib/utils';
 import { api, errorMessage } from '../../lib/api';
 import { useDocumentTitle } from '../../lib/hooks';
 import { Button } from '../../components/ui/Button';
@@ -18,7 +25,17 @@ type Form = z.input<typeof createSessionSchema>;
 export default function NewSession() {
   const navigate = useNavigate();
   const [when, setWhen] = useState<'now' | 'later'>('now');
-  useDocumentTitle('New session');
+  const [params] = useSearchParams();
+  const [mode, setMode] = useState<'PAIRING' | 'INTERVIEW'>(
+    params.get('mode') === 'interview' ? 'INTERVIEW' : 'PAIRING',
+  );
+  const [source, setSource] = useState<'bank' | 'custom'>('bank');
+  const [problemSlug, setProblemSlug] = useState('two-sum');
+  const [custom, setCustom] = useState({ title: '', statement: '' });
+  const [duration, setDuration] = useState(45);
+  const [interviewError, setInterviewError] = useState<string | null>(null);
+  const { data: bank } = useQuery({ ...problemsQuery, enabled: mode === 'INTERVIEW' });
+  useDocumentTitle(mode === 'INTERVIEW' ? 'New interview' : 'New session');
   const {
     register,
     control,
@@ -45,18 +62,128 @@ export default function NewSession() {
     onError: (err) => toast.error(errorMessage(err)),
   });
 
-  const submit = handleSubmit((v) =>
-    create.mutate({ ...v, scheduledFor: when === 'later' ? v.scheduledFor : undefined }),
-  );
+  const submit = handleSubmit((v) => {
+    let interview: Form['interview'];
+    if (mode === 'INTERVIEW') {
+      const parsed = interviewSetupSchema.safeParse(
+        source === 'bank'
+          ? { problemSlug, durationMinutes: duration }
+          : { customProblem: custom, durationMinutes: duration },
+      );
+      if (!parsed.success) {
+        setInterviewError(parsed.error.issues[0]?.message ?? 'Check the problem');
+        return;
+      }
+      setInterviewError(null);
+      interview = parsed.data;
+    }
+    create.mutate({ ...v, interview, scheduledFor: when === 'later' ? v.scheduledFor : undefined });
+  });
 
   return (
     <div className="mx-auto max-w-2xl px-4 py-8 sm:px-6">
-      <h1 className="text-2xl font-bold">Start a coding session</h1>
+      <h1 className="text-2xl font-bold">
+        {mode === 'INTERVIEW' ? 'Set up a mock interview' : 'Start a coding session'}
+      </h1>
       <p className="mt-1 text-sm text-muted">
-        Everyone who joins edits the same document in real time.
+        {mode === 'INTERVIEW'
+          ? 'You are the interviewer: pick a problem, start the clock when the candidate is ready, and keep private notes. Practising alone? Talk it through with the AI interviewer.'
+          : 'Everyone who joins edits the same document in real time.'}
       </p>
       <form onSubmit={submit} className="mt-6" noValidate>
         <Card className="space-y-5 p-6">
+          <div className="space-y-2">
+            <p className="text-sm font-medium">Type</p>
+            <SegmentedControl
+              label="Session type"
+              value={mode}
+              onChange={setMode}
+              options={[
+                { value: 'PAIRING', label: 'Pair programming' },
+                { value: 'INTERVIEW', label: 'Mock interview' },
+              ]}
+            />
+          </div>
+          {mode === 'INTERVIEW' && (
+            <fieldset className="space-y-4 rounded-xl border border-line p-4">
+              <legend className="px-1 text-sm font-semibold">Interview</legend>
+              <SegmentedControl
+                label="Problem source"
+                value={source}
+                onChange={setSource}
+                options={[
+                  { value: 'bank', label: 'From the bank' },
+                  { value: 'custom', label: 'Write my own' },
+                ]}
+              />
+              {source === 'bank' ? (
+                <div role="radiogroup" aria-label="Problem" className="grid gap-2 sm:grid-cols-2">
+                  {(bank?.items ?? []).map((p) => (
+                    <button
+                      key={p.slug}
+                      type="button"
+                      role="radio"
+                      aria-checked={problemSlug === p.slug}
+                      onClick={() => setProblemSlug(p.slug)}
+                      className={cn(
+                        'rounded-lg border p-3 text-left',
+                        problemSlug === p.slug
+                          ? 'border-accent bg-accent-soft'
+                          : 'border-line hover:border-muted',
+                      )}
+                    >
+                      <span className="block text-sm font-medium">{p.title}</span>
+                      <span className="text-xs text-muted">
+                        {p.difficulty} · {p.topics.join(', ')}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <>
+                  <Field label="Problem title">
+                    {(p) => (
+                      <Input
+                        {...p}
+                        value={custom.title}
+                        onChange={(e) => setCustom({ ...custom, title: e.target.value })}
+                      />
+                    )}
+                  </Field>
+                  <Field
+                    label="Problem statement"
+                    hint="Markdown. Hidden from the candidate until you start."
+                  >
+                    {(p) => (
+                      <Textarea
+                        {...p}
+                        rows={6}
+                        value={custom.statement}
+                        onChange={(e) => setCustom({ ...custom, statement: e.target.value })}
+                      />
+                    )}
+                  </Field>
+                </>
+              )}
+              <Field label="Duration (minutes)">
+                {(p) => (
+                  <Input
+                    {...p}
+                    type="number"
+                    min={10}
+                    max={120}
+                    value={duration}
+                    onChange={(e) => setDuration(Number(e.target.value))}
+                  />
+                )}
+              </Field>
+              {interviewError && (
+                <p role="alert" className="text-sm text-danger">
+                  {interviewError}
+                </p>
+              )}
+            </fieldset>
+          )}
           <Field label="Title" error={errors.title?.message}>
             {(p) => (
               <Input

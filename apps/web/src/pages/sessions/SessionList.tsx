@@ -42,6 +42,7 @@ function SessionCard({ s }: { s: SessionDto }) {
             <Lock className="h-3 w-3" /> Private
           </Badge>
         )}
+        {s.mode === 'INTERVIEW' && <Badge tone="accent">Interview</Badge>}
         <Badge className="ml-auto font-mono">{s.language}</Badge>
       </div>
       <Link to={`/sessions/${s.id}`} className="mt-3 text-lg font-semibold hover:text-accent">
@@ -113,6 +114,9 @@ export default function SessionList() {
               ]}
             />
           )}
+          <ButtonLink to="/sessions/new?mode=interview" variant="outline">
+            Mock interview
+          </ButtonLink>
           <ButtonLink to="/sessions/new" icon={<Plus className="h-4 w-4" />}>
             New session
           </ButtonLink>

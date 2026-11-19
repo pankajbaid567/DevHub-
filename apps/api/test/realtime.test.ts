@@ -37,6 +37,7 @@ const { app } = createApp(c, {
     message: (m) => lazy.rt?.broadcaster.message(m),
     runStarted: (i, u, l) => lazy.rt?.broadcaster.runStarted(i, u, l),
     runFinished: (r) => lazy.rt?.broadcaster.runFinished(r),
+    interview: (s) => lazy.rt?.broadcaster.interview(s),
   },
 });
 const server = http.createServer(app);
@@ -204,6 +205,42 @@ describe('collaboration', () => {
     const status = once(b, 'session:status');
     await request(app).post(`/api/v1/sessions/${sessionId}/end`).set(auth(host)).expect(200);
     expect((await status).status).toBe('ENDED');
+  });
+});
+
+describe('interview mode', () => {
+  it('pushes the started clock and revealed problem to the room, never the notes', async () => {
+    const host = await registerUser(app);
+    const guest = await registerUser(app);
+    const s = await request(app)
+      .post('/api/v1/sessions')
+      .set(auth(host))
+      .send({ title: 'Realtime interview', interview: { problemSlug: 'merge-intervals' } })
+      .expect(201);
+    await request(app).post(`/api/v1/sessions/${s.body.id}/join`).set(auth(guest)).expect(200);
+    const b = await client(guest.token);
+    await b.emitWithAck('session:join', { sessionId: s.body.id });
+    const seen: unknown[] = [];
+    b.onAny((_event, payload) => seen.push(payload));
+
+    await request(app)
+      .put(`/api/v1/sessions/${s.body.id}/interview/scorecard`)
+      .set(auth(host))
+      .send({ notes: 'secret interviewer note' })
+      .expect(200);
+    const updated = once(b, 'interview:updated');
+    await request(app)
+      .post(`/api/v1/sessions/${s.body.id}/interview`)
+      .set(auth(host))
+      .send({ action: 'start' })
+      .expect(200);
+    expect(await updated).toMatchObject({
+      sessionId: s.body.id,
+      problemHidden: false,
+      problem: { title: 'Merge Intervals' },
+      durationMinutes: 45,
+    });
+    expect(JSON.stringify(seen)).not.toContain('secret interviewer note');
   });
 });
 

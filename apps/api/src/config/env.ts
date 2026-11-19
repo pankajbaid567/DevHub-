@@ -46,6 +46,14 @@ const envSchema = z
     GEMINI_FALLBACK_MODEL: z.string().default('gemini-3.5-flash-lite'),
     /** Embedding model for semantic search / RAG (768-dim output is requested). */
     GEMINI_EMBED_MODEL: z.string().default('gemini-embedding-001'),
+    /** Native-audio model for the voice interviewer (Gemini Live API, free tier). */
+    GEMINI_LIVE_MODEL: z.string().default('gemini-3.1-flash-live-preview'),
+    GEMINI_LIVE_VOICE: z.string().default('Puck'),
+    /** Set false to hide the voice interviewer even when a Gemini key is configured. */
+    VOICE_INTERVIEWER: z
+      .enum(['true', 'false'])
+      .default('true')
+      .transform((v) => v === 'true'),
     AI_TIMEOUT_MS: z.coerce.number().int().min(1_000).max(120_000).default(45_000),
     /** Comma-separated STUN URLs for WebRTC calls. */
     STUN_URLS: z

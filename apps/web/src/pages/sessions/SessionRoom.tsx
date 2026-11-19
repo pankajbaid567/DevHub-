@@ -18,12 +18,14 @@ import {
   WifiOff,
 } from 'lucide-react';
 import { toast } from 'sonner';
-import type {
-  ChatMessageDto,
-  CursorPage,
-  PresenceEntry,
-  SessionDetailDto,
-  SessionStatus,
+import {
+  DOC_TEXT,
+  type ChatMessageDto,
+  type CursorPage,
+  type InterviewStateDto,
+  type PresenceEntry,
+  type SessionDetailDto,
+  type SessionStatus,
 } from '@devhub/shared';
 import { ApiError, api, errorMessage } from '../../lib/api';
 import { qk } from '../../lib/queryClient';
@@ -37,7 +39,10 @@ import { Input } from '../../components/ui/Field';
 import { PageSpinner } from '../../components/ui/Spinner';
 import { CallPanel } from '../../components/CallPanel';
 import { RunPanel } from '../../components/RunPanel';
-import { useSessionDoc } from '../../lib/useSessionDoc';
+import { useSessionDoc, type SessionDoc } from '../../lib/useSessionDoc';
+import { InterviewPanel } from '../../components/interview/InterviewPanel';
+import { InterviewTimer } from '../../components/interview/InterviewTimer';
+import { clockOffset } from '../../lib/interview';
 import { useCall } from '../../lib/useCall';
 
 const CollabEditor = lazy(() => import('../../components/CollabEditor'));
@@ -53,6 +58,8 @@ interface WorkspaceProps {
   profile: { username: string; displayName: string | null };
   onPresence: (p: PresenceEntry[]) => void;
   onConnectionChange: (connected: boolean) => void;
+  /** Exposes the shared document to the rest of the room (the interview panel reads the code). */
+  onSession?: (s: SessionDoc | null) => void;
 }
 
 /**
@@ -70,8 +77,13 @@ function Workspace({
   profile,
   onPresence,
   onConnectionChange,
+  onSession,
 }: WorkspaceProps) {
   const session = useSessionDoc({ sessionId, me, onPresence, onConnectionChange });
+  useEffect(() => {
+    onSession?.(session);
+    return () => onSession?.(null);
+  }, [session, onSession]);
   const call = useCall(sessionId);
   const { leave } = call;
   const [view, setView] = useState<'code' | 'board'>('code');
@@ -322,7 +334,8 @@ export default function SessionRoom() {
   const qc = useQueryClient();
   const [presence, setPresence] = useState<PresenceEntry[]>([]);
   const [connected, setConnected] = useState(true);
-  const [tab, setTab] = useState<'chat' | 'people'>('chat');
+  const [tabChoice, setTab] = useState<'interview' | 'chat' | 'people' | null>(null);
+  const [doc, setDoc] = useState<SessionDoc | null>(null);
   const [inviteInput, setInviteInput] = useState('');
 
   const {
@@ -361,14 +374,28 @@ export default function SessionRoom() {
           : 'The session is live!',
       );
     };
+    const onInterview = (interview: InterviewStateDto) => {
+      if (interview.sessionId !== id) return;
+      qc.setQueryData<SessionDetailDto>(qk.sessions.detail(id), (old) =>
+        old ? { ...old, interview } : old,
+      );
+    };
     socket.on('session:status', onStatus);
+    socket.on('interview:updated', onInterview);
     return () => {
       socket.off('session:status', onStatus);
+      socket.off('interview:updated', onInterview);
     };
   }, [id, qc]);
 
   const onPresence = useCallback((p: PresenceEntry[]) => setPresence(p), []);
   const me = useMemo(() => ({ id: user?.id ?? '', name: user ? displayName(user) : '' }), [user]);
+  const serverNow = s?.interview?.serverNow;
+  const offsetMs = useMemo(() => (serverNow ? clockOffset({ serverNow }) : 0), [serverNow]);
+  const getCode = useCallback(
+    () => doc?.doc.getText(DOC_TEXT).toString() ?? s?.code ?? '',
+    [doc, s?.code],
+  );
 
   if (isPending) return <PageSpinner label="Opening the session" />;
   if (isError) {
@@ -413,6 +440,10 @@ export default function SessionRoom() {
 
   const isHost = s.myRole === 'HOST';
   const live = s.status === 'LIVE';
+  const tabs = s.interview
+    ? (['interview', 'chat', 'people'] as const)
+    : (['chat', 'people'] as const);
+  const tab = tabChoice ?? tabs[0];
 
   if (!s.myRole) {
     return (
@@ -456,6 +487,12 @@ export default function SessionRoom() {
         <h1 className="truncate text-lg font-semibold">{s.title}</h1>
         <StatusBadge status={s.status} />
         <Badge className="font-mono">{s.language}</Badge>
+        {s.interview && (
+          <>
+            <Badge tone="accent">Interview</Badge>
+            <InterviewTimer state={s.interview} offsetMs={offsetMs} />
+          </>
+        )}
         <span
           className={cn(
             'inline-flex items-center gap-1 text-xs',
@@ -533,7 +570,12 @@ export default function SessionRoom() {
         </p>
       )}
 
-      <div className="grid min-h-0 flex-1 gap-3 lg:grid-cols-[1fr_22rem]">
+      <div
+        className={cn(
+          'grid min-h-0 flex-1 gap-3',
+          s.interview ? 'lg:grid-cols-[1fr_26rem]' : 'lg:grid-cols-[1fr_22rem]',
+        )}
+      >
         <Workspace
           sessionId={id}
           language={s.language}
@@ -544,10 +586,11 @@ export default function SessionRoom() {
           profile={{ username: user?.username ?? '', displayName: user?.displayName ?? null }}
           onPresence={onPresence}
           onConnectionChange={setConnected}
+          onSession={setDoc}
         />
         <Card className="flex min-h-[20rem] flex-col overflow-hidden">
           <div role="tablist" className="flex border-b border-line">
-            {(['chat', 'people'] as const).map((t) => (
+            {tabs.map((t) => (
               <button
                 key={t}
                 role="tab"
@@ -558,11 +601,24 @@ export default function SessionRoom() {
                   tab === t ? 'border-b-2 border-accent text-fg' : 'text-muted',
                 )}
               >
-                {t === 'people' ? `People (${presence.length})` : 'Chat'}
+                {t === 'people'
+                  ? `People (${presence.length})`
+                  : t === 'chat'
+                    ? 'Chat'
+                    : 'Interview'}
               </button>
             ))}
           </div>
-          {tab === 'chat' ? (
+          {tab === 'interview' && s.interview ? (
+            <InterviewPanel
+              session={s}
+              state={s.interview}
+              offsetMs={offsetMs}
+              isInterviewer={isHost}
+              canTalk={s.myRole !== 'VIEWER'}
+              getCode={getCode}
+            />
+          ) : tab === 'chat' ? (
             <Chat sessionId={id} live={live} />
           ) : (
             <ul className="space-y-1 overflow-y-auto p-3">

@@ -19,6 +19,7 @@ async function main(): Promise<void> {
     message: (m) => realtime?.broadcaster.message(m),
     runStarted: (id, u, l) => realtime?.broadcaster.runStarted(id, u, l),
     runFinished: (r) => realtime?.broadcaster.runFinished(r),
+    interview: (s) => realtime?.broadcaster.interview(s),
   };
 
   const { app } = createApp(c, { broadcaster });

@@ -1,7 +1,8 @@
 import { randomBytes } from 'node:crypto';
 import * as Y from 'yjs';
 import { type Prisma } from '../../generated/prisma/client.js';
-import { createSessionSchema, DOC_TEXT, ErrorCode } from '@devhub/shared';
+import { createSessionSchema, DOC_TEXT, ErrorCode, findProblem } from '@devhub/shared';
+import { interviewState } from '../interviews/interview.state.js';
 import type {
   ReplayPageDto,
   ChatMessageDto,
@@ -49,6 +50,7 @@ export class SessionsService {
       title: s.title,
       description: s.description,
       language: s.language,
+      mode: s.mode,
       status: s.status,
       visibility: s.visibility,
       maxParticipants: s.maxParticipants,
@@ -96,6 +98,8 @@ export class SessionsService {
   async create(user: AuthUser, input: CreateSessionInput): Promise<SessionDto> {
     const data = createSessionSchema.parse(input);
     const startNow = !data.scheduledFor;
+    const iv = data.interview;
+    const problem = iv?.problemSlug ? findProblem(iv.problemSlug)! : iv?.customProblem;
     const s = await this.db.$transaction(async (tx) => {
       const created = await tx.session.create({
         data: {
@@ -109,6 +113,13 @@ export class SessionsService {
           startedAt: startNow ? new Date() : null,
           scheduledFor: data.scheduledFor ? new Date(data.scheduledFor) : null,
           hostId: user.id,
+          ...(iv && {
+            mode: 'INTERVIEW' as const,
+            problemSlug: iv.problemSlug ?? null,
+            problemTitle: problem!.title,
+            problemStatement: problem!.statement,
+            durationMinutes: iv.durationMinutes,
+          }),
           tags: { connectOrCreate: tagConnect(data.tags) },
           participants: { create: { userId: user.id, role: 'HOST' } },
         },
@@ -155,6 +166,7 @@ export class SessionsService {
         joinedAt: p.joinedAt.toISOString(),
       })),
       code: s.code,
+      interview: interviewState(s, me?.role === 'HOST'),
     };
   }
 
@@ -234,7 +246,12 @@ export class SessionsService {
     if (s.status === 'ENDED') throw new AppError(409, ErrorCode.CONFLICT, 'Session already ended');
     const updated = await this.db.session.update({
       where: { id },
-      data: { status: 'ENDED', endedAt: new Date() },
+      data: {
+        status: 'ENDED',
+        endedAt: new Date(),
+        // Ending the session stops a running interview clock too.
+        ...(s.mode === 'INTERVIEW' && { interviewEndedAt: s.interviewEndedAt ?? new Date() }),
+      },
       include,
     });
     void this.events.emit('session.ended', { sessionId: id });
@@ -379,7 +396,7 @@ export class SessionsService {
   private async requireManageable(user: AuthUser, id: string) {
     const s = await this.db.session.findUnique({
       where: { id },
-      select: { hostId: true, status: true, visibility: true },
+      select: { hostId: true, status: true, visibility: true, mode: true, interviewEndedAt: true },
     });
     if (!s) throw new NotFoundError('Session');
     assertCan(policies.canManageSession(user, s.hostId), 'Only the host can do that');

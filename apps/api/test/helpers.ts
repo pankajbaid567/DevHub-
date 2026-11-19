@@ -84,6 +84,8 @@ export function tokenFromEmail(mailer: LogMailer, path: string): string {
 }
 
 const TABLES = [
+  'interview_feedback',
+  'interview_scorecards',
   'content_embeddings',
   'outbox',
   'email_tokens',

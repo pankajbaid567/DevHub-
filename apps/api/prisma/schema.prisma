@@ -22,6 +22,18 @@ enum Visibility {
   PRIVATE
 }
 
+enum SessionMode {
+  PAIRING
+  INTERVIEW
+}
+
+enum Recommendation {
+  STRONG_NO
+  NO
+  YES
+  STRONG_YES
+}
+
 /// Declaration order is the sort order (LIVE first) used by session listings.
 enum SessionStatus {
   LIVE
@@ -120,6 +132,8 @@ model User {
   recoveryCodes       RecoveryCode[]
   reports             Report[]             @relation("Reporter")
   resolvedReports     Report[]             @relation("Resolver")
+  scorecards          InterviewScorecard[] @relation("ScorecardAuthor")
+  interviewFeedback   InterviewFeedback[]
 
   @@index([reputation(sort: Desc)])
   @@map("users")
@@ -333,6 +347,7 @@ model Session {
   title           String
   description     String            @default("")
   language        String            @default("javascript")
+  mode            SessionMode       @default(PAIRING)
   status          SessionStatus     @default(SCHEDULED)
   visibility      SessionVisibility @default(PUBLIC)
   inviteCode      String?           @unique
@@ -348,12 +363,24 @@ model Session {
   createdAt       DateTime          @default(now())
   updatedAt       DateTime          @updatedAt
 
+  // Interview mode (null for pairing sessions). The problem is a snapshot, so editing the
+  // bank never changes a past interview.
+  problemSlug        String?
+  problemTitle       String?
+  problemStatement   String?
+  durationMinutes    Int?
+  interviewStartedAt DateTime?
+  interviewEndsAt    DateTime?
+  interviewEndedAt   DateTime?
+
   host         User                 @relation("SessionHost", fields: [hostId], references: [id], onDelete: Cascade)
   participants SessionParticipant[]
   messages     Message[]
   tags         Tag[]
   runs         CodeRun[]
   updates      SessionUpdate[]
+  scorecards   InterviewScorecard[]
+  feedback     InterviewFeedback[]
 
   @@index([visibility, status, createdAt(sort: Desc)])
   @@index([hostId])
@@ -547,4 +574,39 @@ model Report {
   @@unique([reporterId, targetType, targetId])
   @@index([status, targetType, targetId])
   @@map("reports")
+}
+
+/// The interviewer's private notes and ratings. Never broadcast; readable only by its author.
+model InterviewScorecard {
+  sessionId      String
+  interviewerId  String
+  notes          String          @default("")
+  ratings        Json            @default("{}")
+  recommendation Recommendation?
+  updatedAt      DateTime        @updatedAt
+
+  session     Session @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  interviewer User    @relation("ScorecardAuthor", fields: [interviewerId], references: [id], onDelete: Cascade)
+
+  @@id([sessionId, interviewerId])
+  @@map("interview_scorecards")
+}
+
+/// AI feedback on a practice interview with the voice interviewer. Visible to its owner only.
+model InterviewFeedback {
+  id         String   @id @default(cuid())
+  sessionId  String
+  userId     String
+  transcript Json
+  code       String   @default("")
+  feedback   Json
+  model      String
+  createdAt  DateTime @default(now())
+
+  session Session @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([sessionId])
+  @@map("interview_feedback")
 }

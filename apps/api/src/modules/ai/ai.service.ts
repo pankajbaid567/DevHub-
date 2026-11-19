@@ -1,6 +1,9 @@
 import { z, type ZodType } from 'zod';
 import { ErrorCode } from '@devhub/shared';
 import {
+  aiInterviewFeedbackSchema,
+  type AiInterviewFeedback,
+  type TranscriptEntry,
   moderationTriageSchema,
   type ModerationTriage,
   resumeReviewResultSchema,
@@ -28,6 +31,7 @@ import {
   groundingBlock,
   CODE_REVIEW_PROMPT,
   mentorSystemPrompt,
+  INTERVIEW_FEEDBACK_PROMPT,
   MODERATION_PROMPT,
   RESUME_PROMPT,
   SKILLS_PROMPT,
@@ -308,6 +312,31 @@ export class AiService {
       text.slice(0, 6_000),
       moderationTriageSchema,
       'moderation-triage',
+    );
+    return { ...result, model };
+  }
+
+  /** Scores a practice interview from its transcript and final code (validated structured output). */
+  async interviewFeedback(input: {
+    problem: { title: string; statement: string };
+    transcript: TranscriptEntry[];
+    code: string;
+  }): Promise<AiInterviewFeedback & { model: string }> {
+    // Keep the most recent part if a long interview exceeds the budget.
+    const lines = input.transcript.map((t) => `${t.role}: ${t.text}`).join('\n');
+    const content = [
+      `# Problem: ${input.problem.title}`,
+      input.problem.statement.slice(0, 4_000),
+      '# Transcript',
+      lines.length > 24_000 ? `[…earlier turns omitted]\n${lines.slice(-24_000)}` : lines,
+      '# Final code',
+      input.code.slice(0, 12_000) || '(no code written)',
+    ].join('\n\n');
+    const { result, model } = await this.structured(
+      INTERVIEW_FEEDBACK_PROMPT,
+      content,
+      aiInterviewFeedbackSchema,
+      'interview-feedback',
     );
     return { ...result, model };
   }

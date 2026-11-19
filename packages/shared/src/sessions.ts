@@ -1,10 +1,12 @@
 import { z } from 'zod';
 import { languageSchema, pageQuerySchema, tagsSchema, type UserSummary } from './common.js';
+import { interviewSetupSchema, type InterviewStateDto } from './interview.js';
 
 export const SESSION_STATUSES = ['SCHEDULED', 'LIVE', 'ENDED'] as const;
 export type SessionStatus = (typeof SESSION_STATUSES)[number];
 export type SessionVisibility = 'PUBLIC' | 'PRIVATE';
 export type ParticipantRole = 'HOST' | 'EDITOR' | 'VIEWER';
+export type SessionMode = 'PAIRING' | 'INTERVIEW';
 
 export const listSessionsQuerySchema = pageQuerySchema.extend({
   status: z.enum(SESSION_STATUSES).optional(),
@@ -22,6 +24,8 @@ export const createSessionSchema = z
     tags: tagsSchema.default([]),
     /** ISO date-time; omit to start immediately. */
     scheduledFor: z.iso.datetime({ offset: true }).optional(),
+    /** Present for an interview: the host is the interviewer. */
+    interview: interviewSetupSchema.optional(),
   })
   .refine((v) => !v.scheduledFor || new Date(v.scheduledFor).getTime() > Date.now() - 60_000, {
     message: 'Scheduled time must be in the future',
@@ -48,6 +52,7 @@ export interface SessionDto {
   title: string;
   description: string;
   language: string;
+  mode: SessionMode;
   status: SessionStatus;
   visibility: SessionVisibility;
   maxParticipants: number;
@@ -68,6 +73,8 @@ export interface SessionDetailDto extends SessionDto {
   participants: SessionParticipantDto[];
   /** Last saved plain-text snapshot of the shared editor. */
   code: string;
+  /** Interview sessions only. */
+  interview: InterviewStateDto | null;
 }
 
 export interface ChatMessageDto {

@@ -250,3 +250,52 @@ test('a reported answer reaches the admin queue with an AI verdict and can be re
   await author.reload();
   await expect(author.getByText(/not found/i)).toBeVisible();
 });
+
+test('mock interview: the problem stays hidden until the clock starts, notes stay private', async ({
+  browser,
+}) => {
+  const interviewer = await (await browser.newContext()).newPage();
+  const candidate = await (await browser.newContext()).newPage();
+  await signUp(interviewer);
+  await signUp(candidate);
+
+  await interviewer.goto('/sessions/new?mode=interview');
+  await expect(interviewer.getByRole('heading', { name: 'Set up a mock interview' })).toBeVisible();
+  await interviewer.getByLabel('Title').fill(`Interview ${Date.now()}`);
+  await interviewer.getByRole('radio', { name: /LRU Cache/ }).click();
+  await interviewer.getByLabel('Duration (minutes)').fill('30');
+  await interviewer.getByRole('button', { name: 'Go live' }).click();
+  await expect(interviewer.getByRole('heading', { name: 'LRU Cache' })).toBeVisible();
+  await expect(interviewer.getByRole('timer')).toHaveAccessibleName(/not started, 30 minutes/);
+
+  await candidate.goto(interviewer.url());
+  await candidate.getByRole('button', { name: 'Join session' }).click();
+  await expect(
+    candidate.getByText('The problem appears when the interviewer starts'),
+  ).toBeVisible();
+  await expect(candidate.getByRole('heading', { name: 'LRU Cache' })).toHaveCount(0);
+  await expect(candidate.getByLabel('Private interviewer notes')).toHaveCount(0);
+
+  // Private notes autosave.
+  await interviewer.getByLabel('Private interviewer notes').fill('Asked about capacity first.');
+  await interviewer
+    .getByRole('radiogroup', { name: 'Communication' })
+    .getByRole('radio', { name: '3 of 4' })
+    .click();
+  await expect(interviewer.getByText('Saved', { exact: true })).toBeVisible();
+
+  // Starting reveals the problem and starts the same clock for both, live.
+  await interviewer.getByRole('button', { name: 'Start interview' }).click();
+  await expect(candidate.getByRole('heading', { name: 'LRU Cache' })).toBeVisible();
+  await expect(candidate.getByRole('timer')).toHaveAccessibleName(/^(29|30):\d\d left$/);
+  await interviewer.getByRole('button', { name: '5 min' }).click();
+  await expect(candidate.getByRole('timer')).toHaveAccessibleName(/^3[45]:\d\d left$/);
+  await expect(candidate.getByText('Asked about capacity first.')).toHaveCount(0);
+
+  await interviewer.reload();
+  await expect(interviewer.getByLabel('Private interviewer notes')).toHaveValue(
+    'Asked about capacity first.',
+  );
+  await interviewer.getByRole('button', { name: 'End interview' }).click();
+  await expect(candidate.getByRole('timer')).toHaveText('Ended');
+});
