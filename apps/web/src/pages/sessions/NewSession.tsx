@@ -33,6 +33,7 @@ export default function NewSession() {
   const [problemSlug, setProblemSlug] = useState('two-sum');
   const [custom, setCustom] = useState({ title: '', statement: '' });
   const [duration, setDuration] = useState(45);
+  const [proctoringEnabled, setProctoringEnabled] = useState(false);
   const [interviewError, setInterviewError] = useState<string | null>(null);
   const { data: bank } = useQuery({ ...problemsQuery, enabled: mode === 'INTERVIEW' });
   useDocumentTitle(mode === 'INTERVIEW' ? 'New interview' : 'New session');
@@ -65,10 +66,13 @@ export default function NewSession() {
   const submit = handleSubmit((v) => {
     let interview: Form['interview'];
     if (mode === 'INTERVIEW') {
+      const proctoring = proctoringEnabled
+        ? { enabled: true, requireCamera: true, requireScreenShare: true, enforceFullscreen: true, blockCopyPaste: true }
+        : undefined;
       const parsed = interviewSetupSchema.safeParse(
         source === 'bank'
-          ? { problemSlug, durationMinutes: duration }
-          : { customProblem: custom, durationMinutes: duration },
+          ? { problemSlug, durationMinutes: duration, proctoring }
+          : { customProblem: custom, durationMinutes: duration, proctoring },
       );
       if (!parsed.success) {
         setInterviewError(parsed.error.issues[0]?.message ?? 'Check the problem');
@@ -177,6 +181,20 @@ export default function NewSession() {
                   />
                 )}
               </Field>
+              <label className="flex items-center gap-3 rounded-lg border border-line px-3 py-2.5">
+                <input
+                  type="checkbox"
+                  checked={proctoringEnabled}
+                  onChange={(e) => setProctoringEnabled(e.target.checked)}
+                  className="h-4 w-4 rounded border-line accent-accent"
+                />
+                <div>
+                  <span className="text-sm font-medium">Enable proctoring</span>
+                  <span className="ml-2 text-xs text-muted">
+                    Camera, screen share, fullscreen enforcement, copy-paste blocking
+                  </span>
+                </div>
+              </label>
               {interviewError && (
                 <p role="alert" className="text-sm text-danger">
                   {interviewError}

@@ -5,6 +5,7 @@ import {
   INTERVIEW_PROBLEMS,
   scorecardSchema,
   submitSolutionSchema,
+  proctoringEventSchema,
 } from '@devhub/shared';
 import type { Container } from '../../container.js';
 import { defineRoute, type RouteContext } from '../../core/route.js';
@@ -165,6 +166,36 @@ export function interviewRoutes(
       res.json({
         items: await c.interviews.listFeedback(currentUser(req), req.params.id as string),
       });
+    },
+  });
+
+  // ---------------------------------------------------------------- proctoring
+
+  defineRoute(ctx, {
+    method: 'get',
+    path: '/:id/interview/proctoring',
+    tag: 'Interviews',
+    summary: 'Proctoring events and violation count (interviewer only)',
+    auth: 'required',
+    params: idParamSchema,
+    handler: async (req, res) => {
+      res.json(await c.proctoring.getStatus(currentUser(req), req.params.id as string));
+    },
+  });
+
+  defineRoute(ctx, {
+    method: 'post',
+    path: '/:id/interview/proctoring/events',
+    tag: 'Interviews',
+    summary: 'Record a proctoring event (REST fallback for the socket event)',
+    auth: 'required',
+    params: idParamSchema,
+    body: proctoringEventSchema,
+    responses: { 201: 'Recorded' },
+    handler: async (req, res) => {
+      res.status(201).json(
+        await c.proctoring.recordEvent(currentUser(req), req.params.id as string, req.body),
+      );
     },
   });
 }

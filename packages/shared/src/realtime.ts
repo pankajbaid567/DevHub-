@@ -1,7 +1,7 @@
 import type { ChatMessageDto, CodeRunDto, ParticipantRole, SessionStatus } from './sessions.js';
 import type { NotificationDto } from './notifications.js';
 import type { UserSummary } from './common.js';
-import type { InterviewStateDto, SubmissionDto } from './interview.js';
+import type { InterviewStateDto, ProctoringEventDto, ProctoringEventInput, SubmissionDto } from './interview.js';
 
 /**
  * Typed Socket.IO contract. Both the server (`Server<ClientToServer, ServerToClient>`)
@@ -71,6 +71,8 @@ export interface ClientToServerEvents {
   /** WebRTC offer/answer/ICE candidate for one specific peer (relayed, never broadcast). */
   'rtc:signal': (p: RtcSignal & { to: string }) => void;
   'rtc:state': (p: { sessionId: string; audio: boolean; video: boolean; screen: boolean }) => void;
+  /** Proctoring: candidate reports a violation event (tab switch, fullscreen exit, etc.). */
+  'proctoring:event': (p: { sessionId: string } & ProctoringEventInput, ack: Ack) => void;
 }
 
 export interface ServerToClientEvents {
@@ -98,6 +100,10 @@ export interface ServerToClientEvents {
   }) => void;
   /** Sent before the server closes a connection whose token is no longer valid. */
   'auth:expired': () => void;
+  /** Proctoring: a violation event was recorded; interviewers see it in real time. */
+  'proctoring:violation': (e: ProctoringEventDto) => void;
+  /** Proctoring: server warns candidate about a violation. */
+  'proctoring:warning': (p: { sessionId: string; message: string }) => void;
 }
 
 /** Name of the shared Y.Text inside each session document (server and Monaco binding). */

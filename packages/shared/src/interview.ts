@@ -146,6 +146,55 @@ Start with a single process, then discuss how you would enforce it across many A
 
 export const findProblem = (slug: string) => INTERVIEW_PROBLEMS.find((p) => p.slug === slug);
 
+// ---------------------------------------------------------------- proctoring
+
+export const PROCTORING_EVENT_TYPES = [
+  'TAB_SWITCH',
+  'FULLSCREEN_EXIT',
+  'COPY_PASTE',
+  'FOCUS_LOST',
+  'SCREEN_SHARE_STOPPED',
+] as const;
+export type ProctoringEventType = (typeof PROCTORING_EVENT_TYPES)[number];
+
+export const proctoringEventSchema = z.object({
+  type: z.enum(PROCTORING_EVENT_TYPES),
+  detail: z.string().max(500).default(''),
+});
+export type ProctoringEventInput = z.infer<typeof proctoringEventSchema>;
+
+export interface ProctoringEventDto {
+  id: string;
+  sessionId: string;
+  userId: string;
+  username: string;
+  type: ProctoringEventType;
+  detail: string;
+  createdAt: string;
+}
+
+export interface ProctoringConfigDto {
+  enabled: boolean;
+  requireCamera: boolean;
+  requireScreenShare: boolean;
+  enforceFullscreen: boolean;
+  blockCopyPaste: boolean;
+}
+
+export const proctoringConfigSchema = z.object({
+  enabled: z.boolean().default(false),
+  requireCamera: z.boolean().default(false),
+  requireScreenShare: z.boolean().default(false),
+  enforceFullscreen: z.boolean().default(true),
+  blockCopyPaste: z.boolean().default(true),
+});
+
+export interface ProctoringStatusDto {
+  events: ProctoringEventDto[];
+  violations: number;
+  config: ProctoringConfigDto;
+}
+
 export const interviewSetupSchema = z
   .object({
     /** A problem from the bank… */
@@ -158,6 +207,7 @@ export const interviewSetupSchema = z
       })
       .optional(),
     durationMinutes: z.coerce.number().int().min(10).max(120).default(45),
+    proctoring: proctoringConfigSchema.optional(),
   })
   .refine((v) => Boolean(v.problemSlug) !== Boolean(v.customProblem), {
     message: 'Pick a problem from the bank or write your own',
@@ -197,6 +247,8 @@ export interface InterviewStateDto {
   endedAt: string | null;
   /** Server clock when this was produced, so clients can correct for skew. */
   serverNow: string;
+  /** Proctoring settings for the interview, if enabled. */
+  proctoring: ProctoringConfigDto | null;
 }
 
 export const RATING_KEYS = ['problemSolving', 'codeQuality', 'communication', 'testing'] as const;

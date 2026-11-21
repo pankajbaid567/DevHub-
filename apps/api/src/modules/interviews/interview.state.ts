@@ -1,4 +1,4 @@
-import { findProblem, type InterviewStateDto } from '@devhub/shared';
+import { findProblem, type InterviewStateDto, type ProctoringConfigDto } from '@devhub/shared';
 import { hasTests } from './problem-tests.js';
 
 /** The interview columns of a session row. */
@@ -12,6 +12,7 @@ export interface InterviewColumns {
   interviewStartedAt: Date | null;
   interviewEndsAt: Date | null;
   interviewEndedAt: Date | null;
+  proctoringConfig: unknown;
 }
 
 export const interviewSelect = {
@@ -24,6 +25,7 @@ export const interviewSelect = {
   interviewStartedAt: true,
   interviewEndsAt: true,
   interviewEndedAt: true,
+  proctoringConfig: true,
 } as const;
 
 /**
@@ -36,6 +38,7 @@ export function interviewState(
 ): InterviewStateDto | null {
   if (s.mode !== 'INTERVIEW') return null;
   const revealed = viewerIsInterviewer || s.interviewStartedAt !== null;
+  const proctoring = s.proctoringConfig as ProctoringConfigDto | null;
   return {
     sessionId: s.id,
     problem:
@@ -54,5 +57,6 @@ export function interviewState(
     endsAt: s.interviewEndsAt?.toISOString() ?? null,
     endedAt: s.interviewEndedAt?.toISOString() ?? null,
     serverNow: new Date().toISOString(),
+    proctoring: proctoring?.enabled ? proctoring : null,
   };
 }

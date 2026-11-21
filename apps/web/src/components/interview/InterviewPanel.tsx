@@ -35,6 +35,7 @@ import { Badge } from '../ui/primitives';
 import { Button } from '../ui/Button';
 import { Textarea } from '../ui/Field';
 import { TestsPanel } from './TestsPanel';
+import { ProctoringLog } from './ProctoringLog';
 
 const REC_LABEL: Record<Recommendation, string> = {
   STRONG_NO: 'Strong no',
@@ -167,6 +168,7 @@ export function InterviewPanel({
       )}
       <FeedbackHistory sessionId={session.id} />
       {isInterviewer && <Scorecard sessionId={session.id} />}
+      {isInterviewer && state.proctoring && <ProctoringLog sessionId={session.id} />}
     </div>
   );
 }

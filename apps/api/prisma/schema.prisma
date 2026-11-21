@@ -373,16 +373,19 @@ model Session {
   interviewStartedAt DateTime?
   interviewEndsAt    DateTime?
   interviewEndedAt   DateTime?
+  /// Proctoring configuration (JSON): camera, screen share, fullscreen, copy-paste restrictions.
+  proctoringConfig   Json?
 
-  host         User                  @relation("SessionHost", fields: [hostId], references: [id], onDelete: Cascade)
-  participants SessionParticipant[]
-  messages     Message[]
-  tags         Tag[]
-  runs         CodeRun[]
-  updates      SessionUpdate[]
-  scorecards   InterviewScorecard[]
-  feedback     InterviewFeedback[]
-  submissions  InterviewSubmission[]
+  host              User                  @relation("SessionHost", fields: [hostId], references: [id], onDelete: Cascade)
+  participants      SessionParticipant[]
+  messages          Message[]
+  tags              Tag[]
+  runs              CodeRun[]
+  updates           SessionUpdate[]
+  scorecards        InterviewScorecard[]
+  feedback          InterviewFeedback[]
+  submissions       InterviewSubmission[]
+  proctoringEvents  ProctoringEvent[]
 
   @@index([visibility, status, createdAt(sort: Desc)])
   @@index([hostId])
@@ -636,4 +639,21 @@ model InterviewSubmission {
   @@index([sessionId, createdAt(sort: Desc)])
   @@index([userId, createdAt(sort: Desc)])
   @@map("interview_submissions")
+}
+
+/// A proctoring violation recorded during a proctored interview: tab switch, fullscreen
+/// exit, copy-paste, etc. Visible only to the interviewer (host).
+model ProctoringEvent {
+  id        String   @id @default(cuid())
+  sessionId String
+  userId    String
+  type      String // TAB_SWITCH | FULLSCREEN_EXIT | COPY_PASTE | FOCUS_LOST | SCREEN_SHARE_STOPPED
+  detail    String   @default("")
+  createdAt DateTime @default(now())
+
+  session Session @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId, createdAt])
+  @@index([userId])
+  @@map("proctoring_events")
 }

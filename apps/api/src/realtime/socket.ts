@@ -13,6 +13,7 @@ import {
   type ChatMessageDto,
   type ClientToServerEvents,
   type IceServer,
+  type ProctoringEventInput,
   type RtcPeer,
   type ParticipantRole,
   type PresenceEntry,
@@ -352,6 +353,32 @@ export function attachRealtime(httpServer: HttpServer, c: Container) {
         video: Boolean(video),
         screen: Boolean(screen),
       });
+    });
+
+    // ------------------------------------------------------------- proctoring
+    on('proctoring:event', async ({ sessionId, ...input }, ack) => {
+      if (!socket.data.sessions[sessionId])
+        throw new AppError(403, 'FORBIDDEN', 'Join the session first');
+      const event = await c.proctoring.recordEvent(
+        { id: user.id, role: user.role },
+        sessionId,
+        input as ProctoringEventInput,
+      );
+      if (event.id !== 'dropped') {
+        // Notify the interviewer in real time; candidates never see this.
+        const sockets = await io.in(room(sessionId)).fetchSockets();
+        for (const s of sockets) {
+          if (s.data.sessions[sessionId] === 'HOST') {
+            s.emit('proctoring:violation', event);
+          }
+        }
+        // Warn the candidate about the violation.
+        socket.emit('proctoring:warning', {
+          sessionId,
+          message: `Violation detected: ${event.type.replace(/_/g, ' ').toLowerCase()}`,
+        });
+      }
+      ack({ ok: true, data: undefined });
     });
 
     socket.on('disconnecting', () => {

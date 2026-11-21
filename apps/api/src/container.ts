@@ -31,6 +31,7 @@ import { createHandlers } from './jobs/handlers.js';
 import { RunsService } from './modules/runs/runs.service.js';
 import { InterviewService } from './modules/interviews/interview.service.js';
 import { SubmissionsService } from './modules/interviews/submissions.service.js';
+import { ProctoringService } from './modules/interviews/proctoring.service.js';
 import {
   DisabledLiveTokenIssuer,
   GeminiLiveTokenIssuer,
@@ -74,6 +75,7 @@ export interface Container {
   moderation: ModerationService;
   interviews: InterviewService;
   submissions: SubmissionsService;
+  proctoring: ProctoringService;
 }
 
 export interface ContainerOverrides {
@@ -218,5 +220,6 @@ export function createContainer(env: Env, overrides: ContainerOverrides = {}): C
     runs,
     submissions: new SubmissionsService(db, sessions, runs),
     interviews: new InterviewService(db, sessions, ai, liveTokens, cache, logger),
+    proctoring: new ProctoringService(db, logger),
   };
 }

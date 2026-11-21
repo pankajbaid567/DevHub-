@@ -119,6 +119,7 @@ export class SessionsService {
             problemTitle: problem!.title,
             problemStatement: problem!.statement,
             durationMinutes: iv.durationMinutes,
+            ...(iv.proctoring && { proctoringConfig: iv.proctoring }),
           }),
           tags: { connectOrCreate: tagConnect(data.tags) },
           participants: { create: { userId: user.id, role: 'HOST' } },

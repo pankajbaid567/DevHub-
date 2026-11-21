@@ -42,7 +42,9 @@ import { RunPanel } from '../../components/RunPanel';
 import { useSessionDoc, type SessionDoc } from '../../lib/useSessionDoc';
 import { InterviewPanel } from '../../components/interview/InterviewPanel';
 import { InterviewTimer } from '../../components/interview/InterviewTimer';
+import { ProctoringOverlay } from '../../components/interview/ProctoringOverlay';
 import { clockOffset } from '../../lib/interview';
+import { useProctoring } from '../../lib/useProctoring';
 import { useCall } from '../../lib/useCall';
 
 const CollabEditor = lazy(() => import('../../components/CollabEditor'));
@@ -408,6 +410,14 @@ export default function SessionRoom() {
     [doc],
   );
 
+  const isHost = s?.myRole === 'HOST';
+  const proctoring = useProctoring(
+    id,
+    s?.interview?.proctoring ?? null,
+    isHost,
+    Boolean(s?.interview?.startedAt && !s?.interview?.endedAt),
+  );
+
   if (isPending) return <PageSpinner label="Opening the session" />;
   if (isError) {
     const notFound = error instanceof ApiError && error.status === 404;
@@ -449,7 +459,6 @@ export default function SessionRoom() {
     );
   }
 
-  const isHost = s.myRole === 'HOST';
   const live = s.status === 'LIVE';
   const tabs = s.interview
     ? (['interview', 'chat', 'people'] as const)
@@ -659,6 +668,7 @@ export default function SessionRoom() {
           )}
         </Card>
       </div>
+      {!isHost && <ProctoringOverlay {...proctoring} />}
     </div>
   );
 }
