@@ -84,6 +84,7 @@ export function tokenFromEmail(mailer: LogMailer, path: string): string {
 }
 
 const TABLES = [
+  'proctoring_events',
   'interview_submissions',
   'interview_feedback',
   'interview_scorecards',
