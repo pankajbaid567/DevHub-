@@ -1,0 +1,115 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >
+  DevHub+ data tier — RDS PostgreSQL 16 with pgvector + ElastiCache Serverless (Valkey).
+  LLD: db.t4g.micro single-AZ (FREE tier), custom parameter group enables pgvector.
+  ElastiCache Serverless auto-scales with 100 MB floor (covered by FREE tier credits).
+
+Parameters:
+  DbMasterUsername:
+    Type: String
+    Default: devhub
+    NoEcho: true
+  DbMasterPassword:
+    Type: String
+    NoEcho: true
+    MinLength: 12
+    Description: RDS master password (12+ chars). Store in Secrets Manager for production.
+
+Resources:
+  # --- RDS subnet group (private subnets only) ---
+  DbSubnetGroup:
+    Type: AWS::RDS::DBSubnetGroup
+    Properties:
+      DBSubnetGroupDescription: DevHub+ private subnets for RDS
+      SubnetIds:
+        - !ImportValue devhub-private-subnet-1
+        - !ImportValue devhub-private-subnet-2
+      Tags:
+        - Key: Name
+          Value: devhub-db-subnet-group
+
+  # --- Custom parameter group to enable pgvector ---
+  DbParameterGroup:
+    Type: AWS::RDS::DBParameterGroup
+    Properties:
+      Family: postgres16
+      Description: DevHub+ PostgreSQL 16 — pgvector enabled via shared_preload_libraries
+      Parameters:
+        shared_preload_libraries: pg_stat_statements,pgvector
+        log_min_duration_statement: '1000'
+
+  # --- RDS PostgreSQL 16 instance ---
+  DbInstance:
+    Type: AWS::RDS::DBInstance
+    DeletionPolicy: Snapshot
+    UpdateReplacePolicy: Snapshot
+    Properties:
+      DBInstanceIdentifier: devhub-db
+      Engine: postgres
+      EngineVersion: '16.9'
+      DBInstanceClass: db.t4g.micro
+      AllocatedStorage: 20
+      MaxAllocatedStorage: 40
+      StorageType: gp3
+      DBName: devhub
+      MasterUsername: !Ref DbMasterUsername
+      MasterUserPassword: !Ref DbMasterPassword
+      DBSubnetGroupName: !Ref DbSubnetGroup
+      DBParameterGroupName: !Ref DbParameterGroup
+      VPCSecurityGroups:
+        - !ImportValue devhub-rds-sg
+      MultiAZ: false
+      PubliclyAccessible: false
+      BackupRetentionPeriod: 7
+      PreferredBackupWindow: '03:00-04:00'
+      PreferredMaintenanceWindow: 'sun:04:30-sun:05:30'
+      StorageEncrypted: true
+      CopyTagsToSnapshot: true
+      EnablePerformanceInsights: false
+      AutoMinorVersionUpgrade: true
+      Tags:
+        - Key: Name
+          Value: devhub-db
+        - Key: Project
+          Value: devhub
+
+  # --- ElastiCache subnet group ---
+  CacheSubnetGroup:
+    Type: AWS::ElastiCache::SubnetGroup
+    Properties:
+      Description: DevHub+ private subnets for ElastiCache
+      SubnetIds:
+        - !ImportValue devhub-private-subnet-1
+        - !ImportValue devhub-private-subnet-2
+
+  # --- ElastiCache Serverless (Valkey) ---
+  CacheCluster:
+    Type: AWS::ElastiCache::ServerlessCache
+    Properties:
+      ServerlessCacheName: devhub-cache
+      Engine: valkey
+      Description: DevHub+ cache, pub/sub and BullMQ backing store
+      SecurityGroupIds:
+        - !ImportValue devhub-cache-sg
+      SubnetIds:
+        - !ImportValue devhub-private-subnet-1
+        - !ImportValue devhub-private-subnet-2
+      Tags:
+        - Key: Name
+          Value: devhub-cache
+        - Key: Project
+          Value: devhub
+
+Outputs:
+  DbEndpoint:
+    Value: !GetAtt DbInstance.Endpoint.Address
+    Export: { Name: devhub-db-endpoint }
+  DbPort:
+    Value: !GetAtt DbInstance.Endpoint.Port
+    Export: { Name: devhub-db-port }
+  CacheEndpoint:
+    Value: !GetAtt CacheCluster.Endpoint.Address
+    Export: { Name: devhub-cache-endpoint }
+  CachePort:
+    Value: !GetAtt CacheCluster.Endpoint.Port
+    Export: { Name: devhub-cache-port }

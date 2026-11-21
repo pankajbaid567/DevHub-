@@ -1,0 +1,22 @@
+# syntax=docker/dockerfile:1.7
+# AWS variant: ALB handles API routing; nginx only serves the static SPA.
+
+FROM node:20-bookworm-slim AS build
+WORKDIR /app
+COPY package.json package-lock.json ./
+COPY packages/shared/package.json packages/shared/
+COPY apps/api/package.json apps/api/
+COPY apps/web/package.json apps/web/
+COPY apps/runner/package.json apps/runner/
+RUN --mount=type=cache,target=/root/.npm npm ci --workspace @devhub/shared --workspace @devhub/web --include-workspace-root=false
+COPY tsconfig.base.json ./
+COPY packages/shared packages/shared
+COPY apps/web apps/web
+RUN npm run build -w @devhub/shared && npm run build -w @devhub/web
+
+FROM nginxinc/nginx-unprivileged:1.27-alpine AS runtime
+COPY apps/web/nginx.aws.conf /etc/nginx/conf.d/default.conf
+COPY apps/web/security-headers.conf /etc/nginx/snippets/security-headers.conf
+COPY --from=build /app/apps/web/dist /usr/share/nginx/html
+EXPOSE 8080
+HEALTHCHECK --interval=15s --timeout=3s CMD wget -qO- http://127.0.0.1:8080/healthz || exit 1

@@ -1,0 +1,424 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >
+  DevHub+ compute tier — ECS Fargate cluster with API, web, and runner services.
+  HLD: API + web behind ALB (path-based routing), runner in isolated private subnet.
+  LLD: Fargate tasks use least-privilege IAM. Runner has no internet egress (no NAT route).
+
+Parameters:
+  AccountId:
+    Type: String
+  Region:
+    Type: String
+    Default: ap-south-1
+  ApiImageTag:
+    Type: String
+    Default: latest
+  WebImageTag:
+    Type: String
+    Default: latest
+  RunnerImageTag:
+    Type: String
+    Default: latest
+  DbEndpoint:
+    Type: String
+  DbPort:
+    Type: String
+    Default: '5432'
+  DbPassword:
+    Type: String
+    NoEcho: true
+  CacheEndpoint:
+    Type: String
+  CachePort:
+    Type: String
+    Default: '6379'
+  JwtSecret:
+    Type: String
+    NoEcho: true
+  GeminiApiKey:
+    Type: String
+    NoEcho: true
+    Default: ''
+  PublicUrl:
+    Type: String
+    Default: ''
+  RunnerToken:
+    Type: String
+    NoEcho: true
+    Default: 'devhub-runner-prod-token'
+
+Resources:
+  # --- ECS Cluster ---
+  Cluster:
+    Type: AWS::ECS::Cluster
+    Properties:
+      ClusterName: devhub
+      ClusterSettings:
+        - Name: containerInsights
+          Value: enabled
+      Tags:
+        - Key: Project
+          Value: devhub
+
+  # --- CloudWatch log groups ---
+  ApiLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: /ecs/devhub-api
+      RetentionInDays: 14
+
+  WebLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: /ecs/devhub-web
+      RetentionInDays: 14
+
+  RunnerLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: /ecs/devhub-runner
+      RetentionInDays: 14
+
+  # --- IAM roles (least privilege — SOLID: Interface Segregation) ---
+  EcsTaskExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: devhub-ecs-exec-role
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ecs-tasks.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy
+
+  EcsTaskRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: devhub-ecs-task-role
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ecs-tasks.amazonaws.com
+            Action: sts:AssumeRole
+
+  # --- ALB ---
+  ALB:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      Name: devhub-alb
+      Scheme: internet-facing
+      Type: application
+      Subnets:
+        - !ImportValue devhub-public-subnet-1
+        - !ImportValue devhub-public-subnet-2
+      SecurityGroups:
+        - !ImportValue devhub-alb-sg
+      Tags:
+        - Key: Project
+          Value: devhub
+
+  ApiTargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      Name: devhub-api-tg
+      Port: 4000
+      Protocol: HTTP
+      VpcId: !ImportValue devhub-vpc-id
+      TargetType: ip
+      HealthCheckPath: /health
+      HealthCheckIntervalSeconds: 30
+      HealthyThresholdCount: 2
+      UnhealthyThresholdCount: 3
+      Matcher: { HttpCode: '200' }
+      TargetGroupAttributes:
+        - Key: stickiness.enabled
+          Value: 'true'
+        - Key: stickiness.type
+          Value: lb_cookie
+        - Key: stickiness.lb_cookie.duration_seconds
+          Value: '86400'
+
+  WebTargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      Name: devhub-web-tg
+      Port: 8080
+      Protocol: HTTP
+      VpcId: !ImportValue devhub-vpc-id
+      TargetType: ip
+      HealthCheckPath: /healthz
+      HealthCheckIntervalSeconds: 30
+      HealthyThresholdCount: 2
+      UnhealthyThresholdCount: 3
+      Matcher: { HttpCode: '200' }
+
+  HttpListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      LoadBalancerArn: !Ref ALB
+      Port: 80
+      Protocol: HTTP
+      DefaultActions:
+        - Type: forward
+          TargetGroupArn: !Ref WebTargetGroup
+
+  ApiListenerRule:
+    Type: AWS::ElasticLoadBalancingV2::ListenerRule
+    Properties:
+      ListenerArn: !Ref HttpListener
+      Priority: 10
+      Conditions:
+        - Field: path-pattern
+          Values: ['/api/*']
+      Actions:
+        - Type: forward
+          TargetGroupArn: !Ref ApiTargetGroup
+
+  SocketListenerRule:
+    Type: AWS::ElasticLoadBalancingV2::ListenerRule
+    Properties:
+      ListenerArn: !Ref HttpListener
+      Priority: 20
+      Conditions:
+        - Field: path-pattern
+          Values: ['/socket.io/*']
+      Actions:
+        - Type: forward
+          TargetGroupArn: !Ref ApiTargetGroup
+
+  MetricsListenerRule:
+    Type: AWS::ElasticLoadBalancingV2::ListenerRule
+    Properties:
+      ListenerArn: !Ref HttpListener
+      Priority: 30
+      Conditions:
+        - Field: path-pattern
+          Values: ['/metrics', '/health', '/ready']
+      Actions:
+        - Type: forward
+          TargetGroupArn: !Ref ApiTargetGroup
+
+  # --- Service Discovery namespace (runner reachable by DNS) ---
+  ServiceDiscoveryNamespace:
+    Type: AWS::ServiceDiscovery::PrivateDnsNamespace
+    Properties:
+      Name: devhub.local
+      Vpc: !ImportValue devhub-vpc-id
+
+  RunnerServiceDiscovery:
+    Type: AWS::ServiceDiscovery::Service
+    Properties:
+      Name: runner
+      NamespaceId: !Ref ServiceDiscoveryNamespace
+      DnsConfig:
+        DnsRecords:
+          - Type: A
+            TTL: 10
+
+  # --- Task Definitions ---
+  ApiTaskDef:
+    Type: AWS::ECS::TaskDefinition
+    Properties:
+      Family: devhub-api
+      Cpu: '256'
+      Memory: '512'
+      NetworkMode: awsvpc
+      RequiresCompatibilities: [FARGATE]
+      ExecutionRoleArn: !GetAtt EcsTaskExecutionRole.Arn
+      TaskRoleArn: !GetAtt EcsTaskRole.Arn
+      ContainerDefinitions:
+        - Name: api
+          Image: !Sub '${AccountId}.dkr.ecr.${Region}.amazonaws.com/devhub-api:${ApiImageTag}'
+          Essential: true
+          PortMappings:
+            - ContainerPort: 4000
+              Protocol: tcp
+          Environment:
+            - { Name: NODE_ENV, Value: production }
+            - { Name: DATABASE_URL, Value: !Sub 'postgresql://devhub:${DbPassword}@${DbEndpoint}:${DbPort}/devhub?schema=public&sslmode=require' }
+            - { Name: REDIS_URL, Value: !Sub 'rediss://${CacheEndpoint}:${CachePort}' }
+            - { Name: CORS_ORIGINS, Value: !Ref PublicUrl }
+            - { Name: JWT_ACCESS_SECRET, Value: !Ref JwtSecret }
+            - { Name: COOKIE_SECURE, Value: 'true' }
+            - { Name: TRUST_PROXY, Value: '1' }
+            - { Name: GEMINI_API_KEY, Value: !Ref GeminiApiKey }
+            - { Name: SEED_DEMO_DATA, Value: 'false' }
+            - { Name: PUBLIC_URL, Value: !Ref PublicUrl }
+            - { Name: CODE_RUNNER_URL, Value: 'http://runner.devhub.local:2000' }
+            - { Name: RUNNER_TOKEN, Value: !Ref RunnerToken }
+            - { Name: PORT, Value: '4000' }
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group: !Ref ApiLogGroup
+              awslogs-region: !Ref Region
+              awslogs-stream-prefix: api
+          HealthCheck:
+            Command: ['CMD-SHELL', 'node -e "fetch(\"http://127.0.0.1:4000/health\").then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"']
+            Interval: 15
+            Timeout: 5
+            Retries: 3
+            StartPeriod: 30
+
+  WebTaskDef:
+    Type: AWS::ECS::TaskDefinition
+    Properties:
+      Family: devhub-web
+      Cpu: '256'
+      Memory: '512'
+      NetworkMode: awsvpc
+      RequiresCompatibilities: [FARGATE]
+      ExecutionRoleArn: !GetAtt EcsTaskExecutionRole.Arn
+      TaskRoleArn: !GetAtt EcsTaskRole.Arn
+      ContainerDefinitions:
+        - Name: web
+          Image: !Sub '${AccountId}.dkr.ecr.${Region}.amazonaws.com/devhub-web:${WebImageTag}'
+          Essential: true
+          PortMappings:
+            - ContainerPort: 8080
+              Protocol: tcp
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group: !Ref WebLogGroup
+              awslogs-region: !Ref Region
+              awslogs-stream-prefix: web
+          HealthCheck:
+            Command: ['CMD-SHELL', 'wget -qO- http://127.0.0.1:8080/healthz || exit 1']
+            Interval: 15
+            Timeout: 3
+            Retries: 3
+            StartPeriod: 10
+
+  RunnerTaskDef:
+    Type: AWS::ECS::TaskDefinition
+    Properties:
+      Family: devhub-runner
+      Cpu: '256'
+      Memory: '512'
+      NetworkMode: awsvpc
+      RequiresCompatibilities: [FARGATE]
+      ExecutionRoleArn: !GetAtt EcsTaskExecutionRole.Arn
+      TaskRoleArn: !GetAtt EcsTaskRole.Arn
+      ContainerDefinitions:
+        - Name: runner
+          Image: !Sub '${AccountId}.dkr.ecr.${Region}.amazonaws.com/devhub-runner:${RunnerImageTag}'
+          Essential: true
+          PortMappings:
+            - ContainerPort: 2000
+              Protocol: tcp
+          Environment:
+            - { Name: RUNNER_TOKEN, Value: !Ref RunnerToken }
+            - { Name: RUNNER_CONCURRENCY, Value: '2' }
+            - { Name: RUNNER_MAX_PROCS, Value: '96' }
+            - { Name: PORT, Value: '2000' }
+          ReadonlyRootFilesystem: true
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group: !Ref RunnerLogGroup
+              awslogs-region: !Ref Region
+              awslogs-stream-prefix: runner
+          HealthCheck:
+            Command: ['CMD-SHELL', 'wget -qO- http://127.0.0.1:2000/health || exit 1']
+            Interval: 10
+            Timeout: 3
+            Retries: 3
+            StartPeriod: 10
+          LinuxParameters:
+            InitProcessEnabled: true
+
+  # --- ECS Services ---
+  ApiService:
+    Type: AWS::ECS::Service
+    DependsOn: ApiListenerRule
+    Properties:
+      ServiceName: devhub-api
+      Cluster: !Ref Cluster
+      TaskDefinition: !Ref ApiTaskDef
+      DesiredCount: 1
+      LaunchType: FARGATE
+      NetworkConfiguration:
+        AwsvpcConfiguration:
+          Subnets:
+            - !ImportValue devhub-private-subnet-1
+            - !ImportValue devhub-private-subnet-2
+          SecurityGroups:
+            - !ImportValue devhub-ecs-api-sg
+      LoadBalancers:
+        - ContainerName: api
+          ContainerPort: 4000
+          TargetGroupArn: !Ref ApiTargetGroup
+      DeploymentConfiguration:
+        MinimumHealthyPercent: 100
+        MaximumPercent: 200
+        DeploymentCircuitBreaker:
+          Enable: true
+          Rollback: true
+      EnableExecuteCommand: true
+
+  WebService:
+    Type: AWS::ECS::Service
+    DependsOn: HttpListener
+    Properties:
+      ServiceName: devhub-web
+      Cluster: !Ref Cluster
+      TaskDefinition: !Ref WebTaskDef
+      DesiredCount: 1
+      LaunchType: FARGATE
+      NetworkConfiguration:
+        AwsvpcConfiguration:
+          Subnets:
+            - !ImportValue devhub-private-subnet-1
+            - !ImportValue devhub-private-subnet-2
+          SecurityGroups:
+            - !ImportValue devhub-ecs-web-sg
+      LoadBalancers:
+        - ContainerName: web
+          ContainerPort: 8080
+          TargetGroupArn: !Ref WebTargetGroup
+      DeploymentConfiguration:
+        MinimumHealthyPercent: 100
+        MaximumPercent: 200
+        DeploymentCircuitBreaker:
+          Enable: true
+          Rollback: true
+
+  RunnerService:
+    Type: AWS::ECS::Service
+    Properties:
+      ServiceName: devhub-runner
+      Cluster: !Ref Cluster
+      TaskDefinition: !Ref RunnerTaskDef
+      DesiredCount: 1
+      LaunchType: FARGATE
+      NetworkConfiguration:
+        AwsvpcConfiguration:
+          Subnets:
+            - !ImportValue devhub-private-subnet-1
+          SecurityGroups:
+            - !ImportValue devhub-ecs-runner-sg
+      ServiceRegistries:
+        - RegistryArn: !GetAtt RunnerServiceDiscovery.Arn
+      DeploymentConfiguration:
+        MinimumHealthyPercent: 0
+        MaximumPercent: 100
+        DeploymentCircuitBreaker:
+          Enable: true
+          Rollback: true
+
+Outputs:
+  ClusterName:
+    Value: !Ref Cluster
+    Export: { Name: devhub-cluster }
+  AlbDns:
+    Value: !GetAtt ALB.DNSName
+    Export: { Name: devhub-alb-dns }
+  AlbArn:
+    Value: !Ref ALB
+    Export: { Name: devhub-alb-arn }

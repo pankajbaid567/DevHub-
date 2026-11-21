@@ -1,0 +1,284 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >
+  DevHub+ VPC — public/private subnets across 2 AZs, NAT gateway, security groups.
+  HLD: isolates data tier (RDS, ElastiCache) in private subnets; ECS tasks in private
+  subnets reach the internet via NAT for outbound calls (Gemini API, OAuth providers).
+
+Parameters:
+  VpcCidr:
+    Type: String
+    Default: '10.0.0.0/16'
+  PublicSubnet1Cidr:
+    Type: String
+    Default: '10.0.1.0/24'
+  PublicSubnet2Cidr:
+    Type: String
+    Default: '10.0.2.0/24'
+  PrivateSubnet1Cidr:
+    Type: String
+    Default: '10.0.3.0/24'
+  PrivateSubnet2Cidr:
+    Type: String
+    Default: '10.0.4.0/24'
+
+Resources:
+  VPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: !Ref VpcCidr
+      EnableDnsHostnames: true
+      EnableDnsSupport: true
+      Tags:
+        - Key: Name
+          Value: devhub-vpc
+
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+        - Key: Name
+          Value: devhub-igw
+
+  AttachGateway:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      VpcId: !Ref VPC
+      InternetGatewayId: !Ref InternetGateway
+
+  # --- Public subnets (ALB, NAT gateway) ---
+  PublicSubnet1:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      CidrBlock: !Ref PublicSubnet1Cidr
+      AvailabilityZone: !Select [0, !GetAZs '']
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: devhub-public-1
+
+  PublicSubnet2:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      CidrBlock: !Ref PublicSubnet2Cidr
+      AvailabilityZone: !Select [1, !GetAZs '']
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: devhub-public-2
+
+  PublicRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: devhub-public-rt
+
+  PublicRoute:
+    Type: AWS::EC2::Route
+    DependsOn: AttachGateway
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      DestinationCidrBlock: '0.0.0.0/0'
+      GatewayId: !Ref InternetGateway
+
+  PublicSubnet1RTA:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PublicSubnet1
+      RouteTableId: !Ref PublicRouteTable
+
+  PublicSubnet2RTA:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PublicSubnet2
+      RouteTableId: !Ref PublicRouteTable
+
+  # --- NAT gateway (single, cost-conscious for FREE tier) ---
+  NatEIP:
+    Type: AWS::EC2::EIP
+    Properties:
+      Domain: vpc
+
+  NatGateway:
+    Type: AWS::EC2::NatGateway
+    Properties:
+      AllocationId: !GetAtt NatEIP.AllocationId
+      SubnetId: !Ref PublicSubnet1
+      Tags:
+        - Key: Name
+          Value: devhub-nat
+
+  # --- Private subnets (ECS tasks, RDS, ElastiCache) ---
+  PrivateSubnet1:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      CidrBlock: !Ref PrivateSubnet1Cidr
+      AvailabilityZone: !Select [0, !GetAZs '']
+      Tags:
+        - Key: Name
+          Value: devhub-private-1
+
+  PrivateSubnet2:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      CidrBlock: !Ref PrivateSubnet2Cidr
+      AvailabilityZone: !Select [1, !GetAZs '']
+      Tags:
+        - Key: Name
+          Value: devhub-private-2
+
+  PrivateRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: devhub-private-rt
+
+  PrivateRoute:
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId: !Ref PrivateRouteTable
+      DestinationCidrBlock: '0.0.0.0/0'
+      NatGatewayId: !Ref NatGateway
+
+  PrivateSubnet1RTA:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PrivateSubnet1
+      RouteTableId: !Ref PrivateRouteTable
+
+  PrivateSubnet2RTA:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PrivateSubnet2
+      RouteTableId: !Ref PrivateRouteTable
+
+  # --- Security groups ---
+  AlbSG:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: ALB - HTTP/HTTPS from the internet
+      VpcId: !Ref VPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: '0.0.0.0/0'
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIp: '0.0.0.0/0'
+      Tags:
+        - Key: Name
+          Value: devhub-alb-sg
+
+  EcsApiSG:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: ECS API tasks - traffic from ALB only
+      VpcId: !Ref VPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 4000
+          ToPort: 4000
+          SourceSecurityGroupId: !Ref AlbSG
+      Tags:
+        - Key: Name
+          Value: devhub-ecs-api-sg
+
+  EcsWebSG:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: ECS web tasks - traffic from ALB only
+      VpcId: !Ref VPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 8080
+          ToPort: 8080
+          SourceSecurityGroupId: !Ref AlbSG
+      Tags:
+        - Key: Name
+          Value: devhub-ecs-web-sg
+
+  EcsRunnerSG:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: ECS runner - traffic from API only (sandbox isolation)
+      VpcId: !Ref VPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 2000
+          ToPort: 2000
+          SourceSecurityGroupId: !Ref EcsApiSG
+      Tags:
+        - Key: Name
+          Value: devhub-ecs-runner-sg
+
+  RdsSG:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: RDS PostgreSQL - traffic from ECS API only
+      VpcId: !Ref VPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 5432
+          ToPort: 5432
+          SourceSecurityGroupId: !Ref EcsApiSG
+      Tags:
+        - Key: Name
+          Value: devhub-rds-sg
+
+  CacheSG:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: ElastiCache - traffic from ECS API only
+      VpcId: !Ref VPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 6379
+          ToPort: 6379
+          SourceSecurityGroupId: !Ref EcsApiSG
+      Tags:
+        - Key: Name
+          Value: devhub-cache-sg
+
+Outputs:
+  VpcId:
+    Value: !Ref VPC
+    Export: { Name: devhub-vpc-id }
+  PublicSubnet1Id:
+    Value: !Ref PublicSubnet1
+    Export: { Name: devhub-public-subnet-1 }
+  PublicSubnet2Id:
+    Value: !Ref PublicSubnet2
+    Export: { Name: devhub-public-subnet-2 }
+  PrivateSubnet1Id:
+    Value: !Ref PrivateSubnet1
+    Export: { Name: devhub-private-subnet-1 }
+  PrivateSubnet2Id:
+    Value: !Ref PrivateSubnet2
+    Export: { Name: devhub-private-subnet-2 }
+  AlbSGId:
+    Value: !Ref AlbSG
+    Export: { Name: devhub-alb-sg }
+  EcsApiSGId:
+    Value: !Ref EcsApiSG
+    Export: { Name: devhub-ecs-api-sg }
+  EcsWebSGId:
+    Value: !Ref EcsWebSG
+    Export: { Name: devhub-ecs-web-sg }
+  EcsRunnerSGId:
+    Value: !Ref EcsRunnerSG
+    Export: { Name: devhub-ecs-runner-sg }
+  RdsSGId:
+    Value: !Ref RdsSG
+    Export: { Name: devhub-rds-sg }
+  CacheSGId:
+    Value: !Ref CacheSG
+    Export: { Name: devhub-cache-sg }
