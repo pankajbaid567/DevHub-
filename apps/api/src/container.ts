@@ -16,6 +16,7 @@ import { UsersService } from './modules/users/users.service.js';
 import { AiService } from './modules/ai/ai.service.js';
 import type { AIProvider } from './modules/ai/providers/provider.js';
 import { GeminiProvider } from './modules/ai/providers/gemini.js';
+import { BedrockProvider } from './modules/ai/providers/bedrock.js';
 import { DemoProvider } from './modules/ai/providers/demo.js';
 import { EmailTokenService } from './modules/auth/email-token.service.js';
 import { OAuthService } from './modules/auth/oauth.service.js';
@@ -137,7 +138,7 @@ export function createContainer(env: Env, overrides: ContainerOverrides = {}): C
 
   const embedder: Embedder =
     overrides.embedder ??
-    (env.aiEnabled
+    (env.aiEnabled && env.AI_PROVIDER === 'gemini'
       ? new GeminiEmbedder(env.GEMINI_API_KEY!, env.GEMINI_EMBED_MODEL)
       : new HashEmbedder());
   const indexer = new SearchIndexer(db, embedder);
@@ -148,15 +149,25 @@ export function createContainer(env: Env, overrides: ContainerOverrides = {}): C
   const aiProvider: AIProvider =
     overrides.aiProvider ??
     (env.aiEnabled
-      ? new GeminiProvider(
-          {
-            apiKey: env.GEMINI_API_KEY!,
-            model: env.GEMINI_MODEL,
-            fallbackModel: env.GEMINI_FALLBACK_MODEL,
-            timeoutMs: env.AI_TIMEOUT_MS,
-          },
-          logger,
-        )
+      ? env.AI_PROVIDER === 'bedrock'
+        ? new BedrockProvider(
+            {
+              region: env.BEDROCK_REGION,
+              model: env.BEDROCK_MODEL,
+              fallbackModel: env.BEDROCK_FALLBACK_MODEL,
+              timeoutMs: env.AI_TIMEOUT_MS,
+            },
+            logger,
+          )
+        : new GeminiProvider(
+            {
+              apiKey: env.GEMINI_API_KEY!,
+              model: env.GEMINI_MODEL,
+              fallbackModel: env.GEMINI_FALLBACK_MODEL,
+              timeoutMs: env.AI_TIMEOUT_MS,
+            },
+            logger,
+          )
       : new DemoProvider());
 
   const sessions = new SessionsService(db, events, outbox);
@@ -169,7 +180,7 @@ export function createContainer(env: Env, overrides: ContainerOverrides = {}): C
 
   const liveTokens: LiveTokenIssuer =
     overrides.liveTokens ??
-    (env.aiEnabled && env.VOICE_INTERVIEWER
+    (env.aiEnabled && env.VOICE_INTERVIEWER && env.AI_PROVIDER === 'gemini'
       ? new GeminiLiveTokenIssuer(env.GEMINI_API_KEY!, env.GEMINI_LIVE_MODEL, env.GEMINI_LIVE_VOICE)
       : new DisabledLiveTokenIssuer());
 

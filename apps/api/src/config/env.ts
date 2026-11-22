@@ -41,6 +41,8 @@ const envSchema = z
     /** Number of reverse proxies in front of the app (for correct client IPs). */
     TRUST_PROXY: z.coerce.number().int().min(0).max(5).default(0),
 
+    /** Which AI backend to use: 'gemini' (needs GEMINI_API_KEY) or 'bedrock' (uses IAM). */
+    AI_PROVIDER: z.enum(['gemini', 'bedrock']).default('gemini'),
     GEMINI_API_KEY: z.string().optional(),
     GEMINI_MODEL: z.string().default('gemini-3.8-flash'),
     GEMINI_FALLBACK_MODEL: z.string().default('gemini-3.5-flash-lite'),
@@ -49,6 +51,10 @@ const envSchema = z
     /** Native-audio model for the voice interviewer (Gemini Live API, free tier). */
     GEMINI_LIVE_MODEL: z.string().default('gemini-3.1-flash-live-preview'),
     GEMINI_LIVE_VOICE: z.string().default('Puck'),
+    /** Bedrock configuration (used when AI_PROVIDER=bedrock). */
+    BEDROCK_REGION: z.string().default('ap-south-1'),
+    BEDROCK_MODEL: z.string().default('openai.gpt-oss-120b-1:0'),
+    BEDROCK_FALLBACK_MODEL: z.string().default('qwen.qwen3-32b-v1:0'),
     /** Set false to hide the voice interviewer even when a Gemini key is configured. */
     VOICE_INTERVIEWER: z
       .enum(['true', 'false'])
@@ -112,7 +118,9 @@ const envSchema = z
     isProd: e.NODE_ENV === 'production',
     isTest: e.NODE_ENV === 'test',
     cookieSecure: e.COOKIE_SECURE ?? e.NODE_ENV === 'production',
-    aiEnabled: Boolean(e.GEMINI_API_KEY && !e.GEMINI_API_KEY.startsWith('your-')),
+    aiEnabled:
+      e.AI_PROVIDER === 'bedrock' ||
+      Boolean(e.GEMINI_API_KEY && !e.GEMINI_API_KEY.startsWith('your-')),
     publicUrl: (e.PUBLIC_URL ?? e.CORS_ORIGINS[0] ?? 'http://localhost:5173').replace(/\/$/, ''),
     oauth: {
       github:

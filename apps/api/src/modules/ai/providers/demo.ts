@@ -31,7 +31,7 @@ export class DemoProvider implements AIProvider {
 function demoReply(prompt: string): string {
   const topic = prompt.split(/\s+/).slice(0, 12).join(' ');
   return [
-    '> **Demo mode:** no `GEMINI_API_KEY` is configured, so this is a canned response.',
+    '> **Demo mode:** no AI provider is configured, so this is a canned response.',
     '',
     `You asked about: _${topic}${prompt.split(/\s+/).length > 12 ? '…' : ''}_`,
     '',
@@ -52,7 +52,7 @@ function demoReply(prompt: string): string {
     '}',
     '```',
     '',
-    'Set `GEMINI_API_KEY` in `apps/api/.env` to get real, context-aware answers.',
+    'Set `AI_PROVIDER=bedrock` or `GEMINI_API_KEY` in `apps/api/.env` to get real answers.',
   ].join('\n');
 }
 
