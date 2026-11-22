@@ -19,7 +19,7 @@ COPY apps/runner apps/runner
 RUN npm run build -w @devhub/runner
 
 FROM node:22-alpine AS runtime
-RUN apk add --no-cache python3 && rm -rf /usr/lib/python3*/ensurepip /usr/lib/python3*/idlelib
+RUN apk add --no-cache python3 g++ && rm -rf /usr/lib/python3*/ensurepip /usr/lib/python3*/idlelib
 ENV NODE_ENV=production PORT=2000
 WORKDIR /srv
 COPY --from=build /app/apps/runner/package.json ./package.json

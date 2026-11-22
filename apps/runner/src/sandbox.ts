@@ -3,7 +3,7 @@ import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-export type RunLanguage = 'javascript' | 'typescript' | 'python';
+export type RunLanguage = 'javascript' | 'typescript' | 'python' | 'cpp';
 
 export interface RunRequest {
   language: RunLanguage;
@@ -77,6 +77,15 @@ const LANGUAGES: Record<RunLanguage, LanguageSpec> = {
     file: 'main.py',
     // -I: isolated mode (ignores env vars and the user site dir), -B: no .pyc writes.
     command: (f) => ['python3', '-I', '-B', f],
+    limitAddressSpace: true,
+  },
+  cpp: {
+    file: 'main.cpp',
+    command: (f, l) => [
+      '/bin/sh',
+      '-c',
+      `g++ -std=c++17 -O2 -o "${f}.out" "${f}" && exec "${f}.out"`,
+    ],
     limitAddressSpace: true,
   },
 };

@@ -37,6 +37,8 @@ import {
   GeminiLiveTokenIssuer,
   type LiveTokenIssuer,
 } from './modules/interviews/live-token.js';
+import { ProgressService } from './modules/interviews/progress.service.js';
+import { WhiteboardService } from './modules/interviews/whiteboard.service.js';
 import {
   DisabledCodeRunner,
   HttpCodeRunner,
@@ -76,6 +78,8 @@ export interface Container {
   interviews: InterviewService;
   submissions: SubmissionsService;
   proctoring: ProctoringService;
+  progress: ProgressService;
+  whiteboards: WhiteboardService;
 }
 
 export interface ContainerOverrides {
@@ -189,6 +193,8 @@ export function createContainer(env: Env, overrides: ContainerOverrides = {}): C
     }),
   );
 
+  const progress = new ProgressService(db, cache);
+
   return {
     env,
     logger,
@@ -218,8 +224,12 @@ export function createContainer(env: Env, overrides: ContainerOverrides = {}): C
     indexer,
     search,
     runs,
-    submissions: new SubmissionsService(db, sessions, runs),
+    submissions: new SubmissionsService(db, sessions, runs, (uid, slug, p, t, l) => {
+      progress.upsertProgress(uid, slug, p, t, l).catch(() => {});
+    }),
     interviews: new InterviewService(db, sessions, ai, liveTokens, cache, logger),
     proctoring: new ProctoringService(db, logger),
+    progress,
+    whiteboards: new WhiteboardService(db),
   };
 }

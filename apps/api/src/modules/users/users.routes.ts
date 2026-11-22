@@ -74,11 +74,11 @@ export function userRoutes(ctx: RouteContext, c: Container): void {
     method: 'get',
     path: '/:username',
     tag: 'Users',
-    summary: 'Public profile (never includes the email)',
+    summary: 'Public profile with problem stats, badges, CP links',
     params: z.object({ username: usernameSchema }),
     responses: { 200: 'OK', 404: 'Not found' },
     handler: async (req, res) => {
-      res.json(await c.users.profile(req.params.username as string));
+      res.json(await c.progress.publicProfile(req.params.username as string));
     },
   });
 }

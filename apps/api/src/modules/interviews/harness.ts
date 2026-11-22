@@ -21,9 +21,12 @@ export function buildHarness(
   entry: string,
   inputs: TestInput[],
   userCode: string,
+  preamble?: ProblemSuite['preamble'],
 ): Harness {
   const marker = `__DEVHUB_RESULTS_${randomBytes(8).toString('hex')}__`;
   const json = JSON.stringify(inputs);
+  const pyPreamble = preamble?.python ?? '';
+  const jsPreamble = preamble?.javascript ?? '';
   if (language === 'python') {
     // A JSON string literal is a valid Python string literal.
     const call =
@@ -33,7 +36,8 @@ export function buildHarness(
             __v = [None] + [getattr(__obj, __c[0])(*__c[1:]) for __c in __case[1:]]`;
     return {
       marker,
-      code: `${userCode}
+      code: `${pyPreamble}
+${userCode}
 
 def __devhub_run():
     import json as __json
@@ -57,7 +61,8 @@ __devhub_run()
         __v = [null, ...__case.slice(1).map(([m, ...a]) => { const r = __obj[m](...a); return r === undefined ? null : r; })];`;
   return {
     marker,
-    code: `${userCode}
+    code: `${jsPreamble}
+${userCode}
 ;(() => {
   const __out = [];
   for (const __case of ${json}) {

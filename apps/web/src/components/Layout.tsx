@@ -15,6 +15,7 @@ import {
   ShieldAlert,
   Sparkles,
   Sun,
+  Swords,
   Trophy,
   User,
   Users,
@@ -49,6 +50,7 @@ const NAV = [
   { to: '/questions', label: 'Questions', icon: MessageSquareText },
   { to: '/snippets', label: 'Snippets', icon: Code2 },
   { to: '/sessions', label: 'Live sessions', icon: Users },
+  { to: '/practice', label: 'Practice', icon: Swords },
   { to: '/mentor', label: 'AI Mentor', icon: Bot },
   { to: '/leaderboard', label: 'Leaderboard', icon: Trophy },
 ];

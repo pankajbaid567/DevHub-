@@ -6,18 +6,21 @@ import {
   CalendarDays,
   CheckCircle2,
   Code2,
-  MessageSquareText,
+  ExternalLink,
+  Flame,
   Pencil,
+  Trophy,
   Users,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import type {
   CurrentUser,
   Paginated,
-  ProfileDto,
+  PublicProfileDto,
   QuestionSummaryDto,
   SnippetSummaryDto,
 } from '@devhub/shared';
+import { CP_PLATFORM_LABELS } from '@devhub/shared';
 import { api, errorMessage } from '../lib/api';
 import { qk, queryClient } from '../lib/queryClient';
 import { useAuth } from '../auth/context';
@@ -120,12 +123,12 @@ export default function Profile() {
   const { username = '' } = useParams();
   const { user } = useAuth();
   const isMe = user?.username === username.toLowerCase();
-  const [url, setUrl] = useUrlState({ tab: 'questions' });
-  type Tab = 'questions' | 'snippets' | 'resume' | 'skills' | 'account';
+  const [url, setUrl] = useUrlState({ tab: 'overview' });
+  type Tab = 'overview' | 'questions' | 'snippets' | 'resume' | 'skills' | 'account';
   const allowed: Tab[] = isMe
-    ? ['questions', 'snippets', 'resume', 'skills', 'account']
-    : ['questions', 'snippets'];
-  const tab: Tab = allowed.includes(url.tab as Tab) ? (url.tab as Tab) : 'questions';
+    ? ['overview', 'questions', 'snippets', 'resume', 'skills', 'account']
+    : ['overview', 'questions', 'snippets'];
+  const tab: Tab = allowed.includes(url.tab as Tab) ? (url.tab as Tab) : 'overview';
   const setTab = (t: Tab) => setUrl({ tab: t });
   const [editing, setEditing] = useState(false);
   const {
@@ -136,7 +139,7 @@ export default function Profile() {
     refetch,
   } = useQuery({
     queryKey: qk.profile(username),
-    queryFn: () => api<ProfileDto>(`/users/${username}`),
+    queryFn: () => api<PublicProfileDto>(`/users/${username}`),
   });
   const questions = useQuery({
     queryKey: qk.questions.list({ author: username, limit: 10 }),
@@ -168,12 +171,8 @@ export default function Profile() {
 
   const stats = [
     { icon: Award, label: 'Reputation', value: p.reputation },
-    {
-      icon: CheckCircle2,
-      label: 'Answers',
-      value: `${p.stats.answers} (${p.stats.acceptedAnswers} accepted)`,
-    },
-    { icon: MessageSquareText, label: 'Questions', value: p.stats.questions },
+    { icon: CheckCircle2, label: 'Problems solved', value: `${p.problemStats.solved}/${p.problemStats.total}` },
+    { icon: Flame, label: 'Streak', value: `${p.problemStats.streak} days` },
     { icon: Code2, label: 'Snippets', value: p.stats.snippets },
     { icon: Users, label: 'Sessions hosted', value: p.stats.sessionsHosted },
   ];
@@ -261,6 +260,7 @@ export default function Profile() {
           value={tab}
           onChange={setTab}
           options={[
+            { value: 'overview', label: 'Overview' },
             { value: 'questions', label: 'Questions' },
             { value: 'snippets', label: 'Snippets' },
             ...(isMe
@@ -279,7 +279,145 @@ export default function Profile() {
           </p>
         )}
         <div className="mt-4">
-          {tab === 'account' ? (
+          {tab === 'overview' ? (
+            <div className="space-y-6">
+              {/* Difficulty breakdown */}
+              <Card className="p-4">
+                <h3 className="font-semibold">Problem Progress</h3>
+                <div className="mt-3 grid gap-3 sm:grid-cols-3">
+                  <div className="rounded-lg bg-green-50 p-3 dark:bg-green-900/20">
+                    <p className="text-xs text-green-700 dark:text-green-400">Easy</p>
+                    <p className="text-xl font-bold text-green-700 dark:text-green-400">{p.problemStats.easySolved}</p>
+                  </div>
+                  <div className="rounded-lg bg-yellow-50 p-3 dark:bg-yellow-900/20">
+                    <p className="text-xs text-yellow-700 dark:text-yellow-400">Medium</p>
+                    <p className="text-xl font-bold text-yellow-700 dark:text-yellow-400">{p.problemStats.mediumSolved}</p>
+                  </div>
+                  <div className="rounded-lg bg-red-50 p-3 dark:bg-red-900/20">
+                    <p className="text-xs text-red-700 dark:text-red-400">Hard</p>
+                    <p className="text-xl font-bold text-red-700 dark:text-red-400">{p.problemStats.hardSolved}</p>
+                  </div>
+                </div>
+              </Card>
+
+              {/* Topic breakdown */}
+              {p.problemStats.topicBreakdown.length > 0 && (
+                <Card className="p-4">
+                  <h3 className="font-semibold">Topic Breakdown</h3>
+                  <div className="mt-3 space-y-2">
+                    {p.problemStats.topicBreakdown.map((t) => (
+                      <div key={t.topic} className="flex items-center gap-2 text-sm">
+                        <span className="w-32 truncate capitalize">{t.topic}</span>
+                        <div className="h-2 flex-1 overflow-hidden rounded-full bg-surface-2">
+                          <div
+                            className="h-full rounded-full bg-accent transition-all"
+                            style={{ width: `${t.total > 0 ? (t.solved / t.total) * 100 : 0}%` }}
+                          />
+                        </div>
+                        <span className="w-10 text-right text-xs text-muted">{t.solved}/{t.total}</span>
+                      </div>
+                    ))}
+                  </div>
+                </Card>
+              )}
+
+              {/* Badges */}
+              {p.badges.length > 0 && (
+                <Card className="p-4">
+                  <h3 className="flex items-center gap-2 font-semibold">
+                    <Trophy className="h-4 w-4" /> Badges ({p.badges.length})
+                  </h3>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {p.badges.map((b) => (
+                      <span
+                        key={b.badge}
+                        className="inline-flex items-center gap-1 rounded-full bg-surface-2 px-3 py-1 text-sm"
+                        title={b.description}
+                      >
+                        {b.icon} {b.label}
+                      </span>
+                    ))}
+                  </div>
+                </Card>
+              )}
+
+              {/* CP Profiles */}
+              {p.cpProfiles.length > 0 && (
+                <Card className="p-4">
+                  <h3 className="font-semibold">Competitive Programming</h3>
+                  <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                    {p.cpProfiles.map((cp) => (
+                      <a
+                        key={cp.platform}
+                        href={cp.profileUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-2 rounded-lg bg-surface-2 p-3 hover:bg-surface-3 transition-colors"
+                      >
+                        <span className="font-medium">{CP_PLATFORM_LABELS[cp.platform]}</span>
+                        <span className="text-accent">@{cp.username}</span>
+                        <ExternalLink className="ml-auto h-3 w-3 text-muted" />
+                      </a>
+                    ))}
+                  </div>
+                </Card>
+              )}
+
+              {/* Recent solves */}
+              {p.recentSolves.length > 0 && (
+                <Card className="p-4">
+                  <h3 className="font-semibold">Recent Solves</h3>
+                  <ul className="mt-3 divide-y divide-line">
+                    {p.recentSolves.map((s) => (
+                      <li key={s.problemSlug} className="flex items-center gap-3 py-2">
+                        <CheckCircle2 className="h-4 w-4 text-green-500" />
+                        <span className="font-medium">{s.problemTitle}</span>
+                        <span
+                          className={`rounded px-1.5 py-0.5 text-xs font-medium ${
+                            s.difficulty === 'Easy'
+                              ? 'bg-green-50 text-green-600 dark:bg-green-900/30 dark:text-green-400'
+                              : s.difficulty === 'Hard'
+                                ? 'bg-red-50 text-red-600 dark:bg-red-900/30 dark:text-red-400'
+                                : 'bg-yellow-50 text-yellow-600 dark:bg-yellow-900/30 dark:text-yellow-400'
+                          }`}
+                        >
+                          {s.difficulty}
+                        </span>
+                        <span className="ml-auto text-xs text-muted">
+                          {new Date(s.solvedAt).toLocaleDateString()}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </Card>
+              )}
+
+              {/* Interview stats */}
+              {p.interviewStats.totalInterviews > 0 && (
+                <Card className="p-4">
+                  <h3 className="font-semibold">Interview Stats</h3>
+                  <div className="mt-3 grid gap-3 sm:grid-cols-3">
+                    <div className="rounded-lg bg-surface-2 p-3">
+                      <p className="text-xs text-muted">Total Interviews</p>
+                      <p className="text-xl font-bold">{p.interviewStats.totalInterviews}</p>
+                    </div>
+                    {p.interviewStats.averageScore != null && (
+                      <div className="rounded-lg bg-surface-2 p-3">
+                        <p className="text-xs text-muted">Average Score</p>
+                        <p className="text-xl font-bold">{p.interviewStats.averageScore}%</p>
+                      </div>
+                    )}
+                    {p.interviewStats.solvedRate != null && (
+                      <div className="rounded-lg bg-surface-2 p-3">
+                        <p className="text-xs text-muted">Solve Rate</p>
+                        <p className="text-xl font-bold">{p.interviewStats.solvedRate}%</p>
+                      </div>
+                    )}
+                  </div>
+                </Card>
+              )}
+            </div>
+          ) : tab === 'account' ? (
             <AccountSettings />
           ) : tab === 'resume' ? (
             <ResumeReviewer />

@@ -31,6 +31,8 @@ const NewSession = lazy(() => import('./pages/sessions/NewSession'));
 const SessionRoom = lazy(() => import('./pages/sessions/SessionRoom'));
 const SessionReplay = lazy(() => import('./pages/sessions/SessionReplay'));
 const InterviewHistory = lazy(() => import('./pages/InterviewHistory'));
+const Practice = lazy(() => import('./pages/Practice'));
+const Whiteboard = lazy(() => import('./pages/Whiteboard'));
 const Mentor = lazy(() => import('./pages/Mentor'));
 const Career = lazy(() => import('./pages/Career'));
 const Profile = lazy(() => import('./pages/Profile'));
@@ -81,6 +83,9 @@ export function App() {
                 <Route path="sessions/new" element={guard(<NewSession />)} />
                 <Route path="sessions/:id" element={guard(<SessionRoom />)} />
                 <Route path="sessions/:id/replay" element={guard(<SessionReplay />)} />
+                <Route path="practice" element={<Practice />} />
+                <Route path="whiteboard/:id" element={guard(<Whiteboard />)} />
+                <Route path="whiteboard/new" element={guard(<Whiteboard />)} />
                 <Route path="interviews" element={guard(<InterviewHistory />)} />
                 <Route path="mentor" element={guard(<Mentor />)} />
                 <Route path="mentor/:id" element={guard(<Mentor />)} />

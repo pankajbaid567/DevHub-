@@ -57,4 +57,15 @@ export const qk = {
   conversation: (id: string) => ['conversations', id] as const,
   resumeReviews: ['resume-reviews'] as const,
   aiStatus: ['ai-status'] as const,
+  practice: {
+    problems: ['practice', 'problems'] as const,
+    progress: ['practice', 'progress'] as const,
+    streak: ['practice', 'streak'] as const,
+    bookmarks: ['practice', 'bookmarks'] as const,
+    badges: ['practice', 'badges'] as const,
+    cpProfiles: ['practice', 'cp-profiles'] as const,
+    whiteboards: ['practice', 'whiteboards'] as const,
+    whiteboard: (id: string) => ['practice', 'whiteboards', id] as const,
+    note: (slug: string) => ['practice', 'notes', slug] as const,
+  },
 };

@@ -135,6 +135,12 @@ model User {
   scorecards          InterviewScorecard[]  @relation("ScorecardAuthor")
   interviewFeedback   InterviewFeedback[]
   submissions         InterviewSubmission[]
+  problemProgress     ProblemProgress[]
+  problemBookmarks    ProblemBookmark[]
+  problemNotes        ProblemNote[]
+  badges              UserBadge[]
+  cpProfiles          CpPlatformProfile[]
+  whiteboards         Whiteboard[]
 
   @@index([reputation(sort: Desc)])
   @@map("users")
@@ -386,6 +392,7 @@ model Session {
   feedback          InterviewFeedback[]
   submissions       InterviewSubmission[]
   proctoringEvents  ProctoringEvent[]
+  whiteboards       Whiteboard[]
 
   @@index([visibility, status, createdAt(sort: Desc)])
   @@index([hostId])
@@ -656,4 +663,106 @@ model ProctoringEvent {
   @@index([sessionId, createdAt])
   @@index([userId])
   @@map("proctoring_events")
+}
+
+// ================================================================
+// Problem progress, profiles, badges, whiteboards
+// ================================================================
+
+enum ProblemStatus {
+  ATTEMPTED
+  SOLVED
+}
+
+/// Tracks a user's progress on each coding problem.
+model ProblemProgress {
+  userId      String
+  problemSlug String
+  status      ProblemStatus @default(ATTEMPTED)
+  attempts    Int           @default(1)
+  bestPassed  Int           @default(0)
+  bestTotal   Int           @default(0)
+  language    String?
+  solvedAt    DateTime?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([userId, problemSlug])
+  @@index([userId, status])
+  @@map("problem_progress")
+}
+
+model ProblemBookmark {
+  userId      String
+  problemSlug String
+  createdAt   DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([userId, problemSlug])
+  @@map("problem_bookmarks")
+}
+
+model ProblemNote {
+  userId      String
+  problemSlug String
+  content     String   @default("")
+  updatedAt   DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([userId, problemSlug])
+  @@map("problem_notes")
+}
+
+/// Competitive programming platform profile links.
+model CpPlatformProfile {
+  userId    String
+  platform  String // leetcode | codeforces | codechef | gfg | hackerrank
+  username  String
+  /// Cached stats from the platform API (JSON). Refreshed periodically.
+  stats     Json?
+  syncedAt  DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([userId, platform])
+  @@map("cp_platform_profiles")
+}
+
+/// Achievement badges earned by users.
+model UserBadge {
+  id        String   @id @default(cuid())
+  userId    String
+  badge     String // e.g. "dp-warrior", "tree-master", "streak-7", "first-solve"
+  label     String
+  earnedAt  DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, badge])
+  @@index([userId])
+  @@map("user_badges")
+}
+
+/// Saved whiteboard diagrams for system design interviews.
+model Whiteboard {
+  id        String   @id @default(cuid())
+  userId    String
+  title     String   @default("Untitled")
+  /// Excalidraw scene data (JSON).
+  data      Json
+  sessionId String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  session Session? @relation(fields: [sessionId], references: [id], onDelete: SetNull)
+
+  @@index([userId, updatedAt(sort: Desc)])
+  @@map("whiteboards")
 }

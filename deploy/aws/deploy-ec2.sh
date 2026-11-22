@@ -65,11 +65,21 @@ ssm_run "Setting up environment" '[
   "cat .env.aws | grep -v SECRET | grep -v PASSWORD | grep -v KEY | grep -v TOKEN"
 ]'
 
-# Step 3: Build and start containers
+# Step 3a: Set up swap (2GB) to prevent OOM during Docker builds
+ssm_run "Setting up swap (2GB)" '[
+  "set -e",
+  "if swapon --show | grep -q /swapfile; then echo Swap already active; swapon --show; exit 0; fi",
+  "fallocate -l 2G /swapfile && chmod 600 /swapfile && mkswap /swapfile && swapon /swapfile",
+  "echo /swapfile none swap sw 0 0 >> /etc/fstab",
+  "echo Swap enabled:; swapon --show; free -h"
+]'
+
+# Step 3b: Build and start containers (sequential to stay within memory)
 ssm_run "Building Docker images (this takes a few minutes)" '[
   "set -e",
   "cd '"$DEPLOY_DIR"'",
-  "docker compose -f docker-compose.aws.yml build --parallel 2>&1 | tail -20"
+  "export NODE_OPTIONS=--max-old-space-size=1024",
+  "docker compose -f docker-compose.aws.yml build 2>&1 | tail -30"
 ]'
 
 ssm_run "Starting services" '[
@@ -80,12 +90,12 @@ ssm_run "Starting services" '[
   "docker compose -f docker-compose.aws.yml ps"
 ]'
 
-# Step 4: Add Caddy subdomain config
+# Step 4: Add Caddy subdomain config (routes /api/* and /socket.io/* to API, rest to web)
 ssm_run "Configuring Caddy reverse proxy" '[
   "set -e",
   "CADDYFILE=$(docker exec caddy cat /etc/caddy/Caddyfile 2>/dev/null)",
   "if echo \"$CADDYFILE\" | grep -q \"'"$SUBDOMAIN"'\"; then echo Caddy already configured for '"$SUBDOMAIN"'; exit 0; fi",
-  "docker exec caddy sh -c \"cat >> /etc/caddy/Caddyfile << EOF\n\n'"$SUBDOMAIN"' {\n  encode gzip\n  handle /api/* {\n    reverse_proxy 127.0.0.1:4000\n  }\n  handle /socket.io/* {\n    reverse_proxy 127.0.0.1:4000\n  }\n  handle /health {\n    reverse_proxy 127.0.0.1:4000\n  }\n  handle /ready {\n    reverse_proxy 127.0.0.1:4000\n  }\n  handle /metrics {\n    reverse_proxy 127.0.0.1:4000\n  }\n  handle {\n    reverse_proxy 127.0.0.1:8080\n  }\n  header {\n    Strict-Transport-Security \\\"max-age=31536000\\\"\n    X-Content-Type-Options \\\"nosniff\\\"\n    X-Frame-Options \\\"DENY\\\"\n  }\n}\nEOF\"",
+  "docker exec caddy sh -c \"cat >> /etc/caddy/Caddyfile << EOF\n\n'"$SUBDOMAIN"' {\n  encode gzip\n  handle /api/* {\n    reverse_proxy 127.0.0.1:4000\n  }\n  handle /socket.io/* {\n    reverse_proxy 127.0.0.1:4000\n  }\n  handle {\n    reverse_proxy 127.0.0.1:8080\n  }\n  header {\n    Strict-Transport-Security \\\"max-age=31536000\\\"\n    X-Content-Type-Options \\\"nosniff\\\"\n    X-Frame-Options \\\"DENY\\\"\n  }\n}\nEOF\"",
   "docker exec caddy caddy reload --config /etc/caddy/Caddyfile 2>&1",
   "echo Caddy configured for '"$SUBDOMAIN"'"
 ]'

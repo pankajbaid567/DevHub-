@@ -59,6 +59,7 @@ export class SubmissionsService {
     private readonly db: Db,
     private readonly sessions: SessionsService,
     private readonly runs: RunsService,
+    private readonly onSubmission?: (userId: string, slug: string, passed: number, total: number, lang: string) => void,
   ) {}
 
   async submit(
@@ -82,13 +83,17 @@ export class SubmissionsService {
     await this.sessions.requireParticipant(user, sessionId);
     if (s.mode !== 'INTERVIEW') throw conflict('This is not an interview session');
     if (!hasTests(s.problemSlug)) throw conflict('This problem has no automatic tests');
+    if (language === 'cpp') throw conflict('Auto-grading is not available for C++. Use the Run button to test your code.');
     if (s.hostId !== user.id && !s.interviewStartedAt)
       throw conflict('Wait for the interviewer to start the interview');
     if (s.interviewEndedAt) throw conflict('This interview has ended');
 
     const problem = findProblem(s.problemSlug)!;
     const suite = PROBLEM_SUITES[s.problemSlug]!;
-    const entry = language === 'python' ? problem.entry.python : problem.entry.javascript;
+    const baseEntry = language === 'python' ? problem.entry.python : problem.entry.javascript;
+    const entry = suite.entryOverride
+      ? (language === 'python' ? suite.entryOverride.python : suite.entryOverride.javascript)
+      : baseEntry;
 
     return this.runs.exclusive(user, sessionId, async () => {
       const harness = buildHarness(
@@ -97,6 +102,7 @@ export class SubmissionsService {
         entry,
         suite.cases.map((c) => c.input),
         code,
+        suite.preamble,
       );
       const run = await this.runs.execute({ language, code: harness.code });
       const { printed, outputs } = parseHarnessOutput(run.stdout, harness.marker);
@@ -145,6 +151,7 @@ export class SubmissionsService {
       });
       const dto = toDto(row);
       broadcast.submission(dto);
+      this.onSubmission?.(user.id, s.problemSlug!, passed, cases.length, language);
       return dto;
     });
   }

@@ -20,6 +20,7 @@ import { answerRoutes, questionRoutes, tagRoutes } from './modules/questions/que
 import { snippetRoutes } from './modules/snippets/snippets.routes.js';
 import { sessionRoutes } from './modules/sessions/sessions.routes.js';
 import { interviewRoutes } from './modules/interviews/interview.routes.js';
+import { progressRoutes } from './modules/interviews/progress.routes.js';
 import { notificationRoutes, userRoutes } from './modules/users/users.routes.js';
 import { aiRoutes } from './modules/ai/ai.routes.js';
 import { searchRoutes } from './modules/search/search.routes.js';
@@ -139,6 +140,7 @@ export function createApp(
     sessionRoutes(ctx, c, broadcaster);
     interviewRoutes(ctx, c, broadcaster);
   });
+  mount('/practice', (ctx) => progressRoutes(ctx, c));
   mount('/users', (ctx) => userRoutes(ctx, c));
   mount('/notifications', (ctx) => notificationRoutes(ctx, c));
   mount('/ai', (ctx) => aiRoutes(ctx, c, limiters.ai));
