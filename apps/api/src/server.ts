@@ -37,7 +37,11 @@ async function main(): Promise<void> {
     logger.info(
       {
         port: env.PORT,
-        ai: c.ai.isDemo ? 'demo' : env.GEMINI_MODEL,
+        ai: c.ai.isDemo
+          ? 'demo'
+          : env.AI_PROVIDER === 'bedrock'
+            ? `bedrock/${env.BEDROCK_MODEL}`
+            : env.GEMINI_MODEL,
         embeddings: c.search.model,
         redis: Boolean(c.redis),
         queue: c.queue.kind,
