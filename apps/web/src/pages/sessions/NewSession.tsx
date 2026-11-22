@@ -4,6 +4,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { toast } from 'sonner';
+import { Sparkles } from 'lucide-react';
 import type { z } from 'zod';
 import {
   createSessionSchema,
@@ -29,7 +30,7 @@ export default function NewSession() {
   const [mode, setMode] = useState<'PAIRING' | 'INTERVIEW'>(
     params.get('mode') === 'interview' ? 'INTERVIEW' : 'PAIRING',
   );
-  const [source, setSource] = useState<'bank' | 'custom'>('bank');
+  const [source, setSource] = useState<'random' | 'bank' | 'custom'>('random');
   const [problemSlug, setProblemSlug] = useState('two-sum');
   const [custom, setCustom] = useState({ title: '', statement: '' });
   const [duration, setDuration] = useState(45);
@@ -70,9 +71,11 @@ export default function NewSession() {
         ? { enabled: true, requireCamera: true, requireScreenShare: true, enforceFullscreen: true, blockCopyPaste: true }
         : undefined;
       const parsed = interviewSetupSchema.safeParse(
-        source === 'bank'
-          ? { problemSlug, durationMinutes: duration, proctoring }
-          : { customProblem: custom, durationMinutes: duration, proctoring },
+        source === 'random'
+          ? { problemSlug: 'random', durationMinutes: duration, proctoring }
+          : source === 'bank'
+            ? { problemSlug, durationMinutes: duration, proctoring }
+            : { customProblem: custom, durationMinutes: duration, proctoring },
       );
       if (!parsed.success) {
         setInterviewError(parsed.error.issues[0]?.message ?? 'Check the problem');
@@ -116,11 +119,23 @@ export default function NewSession() {
                 value={source}
                 onChange={setSource}
                 options={[
-                  { value: 'bank', label: 'From the bank' },
+                  { value: 'random', label: 'AI picks' },
+                  { value: 'bank', label: 'Choose' },
                   { value: 'custom', label: 'Write my own' },
                 ]}
               />
-              {source === 'bank' ? (
+              {source === 'random' ? (
+                <div className="flex items-center gap-3 rounded-lg border border-dashed border-accent/40 bg-accent/5 p-4">
+                  <Sparkles className="h-5 w-5 text-accent" />
+                  <div>
+                    <p className="text-sm font-medium">AI will pick a random problem</p>
+                    <p className="text-xs text-muted">
+                      A problem will be selected from the bank matching the difficulty level.
+                      The candidate won't see it until you start the interview.
+                    </p>
+                  </div>
+                </div>
+              ) : source === 'bank' ? (
                 <div role="radiogroup" aria-label="Problem" className="grid gap-2 sm:grid-cols-2">
                   {(bank?.items ?? []).map((p) => (
                     <button

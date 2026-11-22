@@ -840,6 +840,9 @@ export const SYSTEM_DESIGN_PROBLEMS: readonly SystemDesignProblem[] = [
 
 export const findProblem = (slug: string) => INTERVIEW_PROBLEMS.find((p) => p.slug === slug);
 export const findSystemDesignProblem = (slug: string) => SYSTEM_DESIGN_PROBLEMS.find((p) => p.slug === slug);
+export function randomProblem(): InterviewProblem {
+  return INTERVIEW_PROBLEMS[Math.floor(Math.random() * INTERVIEW_PROBLEMS.length)]!;
+}
 
 // ---------------------------------------------------------------- proctoring
 
@@ -908,7 +911,7 @@ export const interviewSetupSchema = z
     message: 'Pick a problem from the bank or write your own',
     path: ['problemSlug'],
   })
-  .refine((v) => !v.problemSlug || findProblem(v.problemSlug), {
+  .refine((v) => !v.problemSlug || v.problemSlug === 'random' || findProblem(v.problemSlug), {
     message: 'Unknown problem',
     path: ['problemSlug'],
   });

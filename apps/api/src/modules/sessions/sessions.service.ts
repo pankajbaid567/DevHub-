@@ -1,7 +1,7 @@
 import { randomBytes } from 'node:crypto';
 import * as Y from 'yjs';
 import { type Prisma } from '../../generated/prisma/client.js';
-import { createSessionSchema, DOC_TEXT, ErrorCode, findProblem } from '@devhub/shared';
+import { createSessionSchema, DOC_TEXT, ErrorCode, findProblem, randomProblem } from '@devhub/shared';
 import { interviewState } from '../interviews/interview.state.js';
 import type {
   ReplayPageDto,
@@ -99,7 +99,8 @@ export class SessionsService {
     const data = createSessionSchema.parse(input);
     const startNow = !data.scheduledFor;
     const iv = data.interview;
-    const problem = iv?.problemSlug ? findProblem(iv.problemSlug)! : iv?.customProblem;
+    const resolvedSlug = iv?.problemSlug === 'random' ? randomProblem().slug : iv?.problemSlug;
+    const problem = resolvedSlug ? findProblem(resolvedSlug)! : iv?.customProblem;
     const s = await this.db.$transaction(async (tx) => {
       const created = await tx.session.create({
         data: {
@@ -115,7 +116,7 @@ export class SessionsService {
           hostId: user.id,
           ...(iv && {
             mode: 'INTERVIEW' as const,
-            problemSlug: iv.problemSlug ?? null,
+            problemSlug: resolvedSlug ?? null,
             problemTitle: problem!.title,
             problemStatement: problem!.statement,
             durationMinutes: iv.durationMinutes,
