@@ -66,7 +66,7 @@ export default function TakeAssessment() {
   const [answers, setAnswers] = useState<Record<string, Record<number, number | string>>>({});
   const [codingSolutions, setCodingSolutions] = useState<Record<string, Record<string, string>>>({});
   const [timeLeft, setTimeLeft] = useState<number | null>(null);
-  const timerRef = useRef<ReturnType<typeof setInterval>>();
+  const timerRef = useRef<ReturnType<typeof setInterval>>(undefined);
 
   const assessment = assessmentQuery.data;
 
@@ -249,7 +249,7 @@ export default function TakeAssessment() {
     );
   }
 
-  const section = assessment.sections[currentSection];
+  const section = assessment.sections[currentSection]!;
   const SectionIcon = sectionIcon[section.type];
 
   return (

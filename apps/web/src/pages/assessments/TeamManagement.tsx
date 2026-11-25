@@ -5,7 +5,6 @@ import { toast } from 'sonner';
 import {
   ArrowLeft,
   Crown,
-  Mail,
   Shield,
   Trash2,
   UserPlus,
@@ -133,7 +132,7 @@ export default function TeamManagement() {
           ))}
         </div>
       ) : members.length === 0 ? (
-        <EmptyState icon={Users} title="No members" description="Invite your team to get started" />
+        <EmptyState icon={<Users />} title="No members">Invite your team to get started</EmptyState>
       ) : (
         <div className="space-y-2">
           {members.map((m) => {
@@ -141,8 +140,8 @@ export default function TeamManagement() {
             return (
               <Card key={m.user.id} className="flex items-center gap-4 p-4">
                 <Avatar
+                  name={m.user.displayName ?? m.user.username}
                   src={m.user.avatarUrl}
-                  alt={m.user.displayName ?? m.user.username}
                   size={40}
                 />
                 <div className="flex-1">

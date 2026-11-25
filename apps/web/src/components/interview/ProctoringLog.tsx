@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
   AlertTriangle,
-  Ban,
   Camera,
   Clock,
   Copy,
@@ -15,7 +14,7 @@ import {
   Shield,
   Wrench,
 } from 'lucide-react';
-import type { ProctoringEventDto, ProctoringEventType, ProctoringStatusDto } from '@devhub/shared';
+import type { ProctoringEventDto, ProctoringStatusDto } from '@devhub/shared';
 import { api } from '../../lib/api';
 import { qk } from '../../lib/queryClient';
 import { getSocket } from '../../lib/socket';

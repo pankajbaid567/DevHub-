@@ -4,47 +4,23 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import {
   Building2,
+  CheckCircle2,
   Plus,
   Users,
   FileText,
   BarChart3,
-  Copy,
-  CheckCircle2,
-  Clock,
-  AlertCircle,
   ArrowRight,
   Eye,
   Archive,
-  Zap,
 } from 'lucide-react';
 import type {
   OrgDto,
   AssessmentDto,
-  CandidateInviteDto,
-  CandidateStatus,
 } from '@devhub/shared';
 import { api, errorMessage } from '../../lib/api';
 import { useDocumentTitle } from '../../lib/hooks';
 import { Button } from '../../components/ui/Button';
 import { Card, EmptyState, ErrorState, Skeleton } from '../../components/ui/primitives';
-
-const statusColors: Record<CandidateStatus, string> = {
-  INVITED: 'text-blue-400',
-  STARTED: 'text-yellow-400',
-  IN_PROGRESS: 'text-orange-400',
-  SUBMITTED: 'text-green-400',
-  EVALUATED: 'text-emerald-400',
-  EXPIRED: 'text-muted',
-};
-
-const statusIcons: Record<CandidateStatus, typeof Clock> = {
-  INVITED: Clock,
-  STARTED: Zap,
-  IN_PROGRESS: Zap,
-  SUBMITTED: CheckCircle2,
-  EVALUATED: BarChart3,
-  EXPIRED: AlertCircle,
-};
 
 export default function AssessmentDashboard() {
   useDocumentTitle('Assessment Dashboard');
@@ -63,7 +39,7 @@ export default function AssessmentDashboard() {
     enabled: Boolean(orgId),
   });
 
-  const [showCreateOrg, setShowCreateOrg] = useState(false);
+  const [_showCreateOrg, setShowCreateOrg] = useState(false);
   const [orgName, setOrgName] = useState('');
   const [orgSlug, setOrgSlug] = useState('');
 
@@ -248,10 +224,9 @@ export default function AssessmentDashboard() {
         </div>
       ) : assessments.length === 0 ? (
         <EmptyState
-          icon={FileText}
+          icon={<FileText />}
           title="No assessments yet"
-          description="Create your first assessment to start evaluating candidates"
-        />
+        >Create your first assessment to start evaluating candidates</EmptyState>
       ) : (
         <div className="space-y-3">
           {assessments.map((a) => (

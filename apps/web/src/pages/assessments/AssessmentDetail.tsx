@@ -1,21 +1,17 @@
 import { useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import {
   ArrowLeft,
-  CheckCircle2,
-  Clock,
   Copy,
   FileText,
   Mail,
   Plus,
   Send,
-  Shield,
   Users,
   Zap,
   BarChart3,
-  AlertCircle,
   Archive,
 } from 'lucide-react';
 import type { CandidateStatus } from '@devhub/shared';
@@ -259,10 +255,9 @@ export default function AssessmentDetail() {
           </div>
         ) : candidates.length === 0 ? (
           <EmptyState
-            icon={Users}
+            icon={<Users />}
             title="No candidates yet"
-            description={assessment.status === 'ACTIVE' ? 'Invite candidates to get started' : 'Activate the assessment first, then invite candidates'}
-          />
+          >{assessment.status === 'ACTIVE' ? 'Invite candidates to get started' : 'Activate the assessment first, then invite candidates'}</EmptyState>
         ) : (
           <div className="space-y-2">
             {candidates.map((c) => (

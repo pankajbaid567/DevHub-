@@ -94,7 +94,7 @@ export default function CreateAssessment() {
   };
 
   const addMcqQuestion = (sectionIdx: number) => {
-    const section = sections[sectionIdx];
+    const section = sections[sectionIdx]!;
     updateSection(sectionIdx, {
       mcqQuestions: [
         ...section.mcqQuestions,
@@ -109,13 +109,13 @@ export default function CreateAssessment() {
   };
 
   const updateMcqQuestion = (sectionIdx: number, qIdx: number, updates: Partial<McqQuestion>) => {
-    const section = sections[sectionIdx];
+    const section = sections[sectionIdx]!;
     const updated = section.mcqQuestions.map((q, i) => (i === qIdx ? { ...q, ...updates } : q));
     updateSection(sectionIdx, { mcqQuestions: updated });
   };
 
   const removeMcqQuestion = (sectionIdx: number, qIdx: number) => {
-    const section = sections[sectionIdx];
+    const section = sections[sectionIdx]!;
     updateSection(sectionIdx, {
       mcqQuestions: section.mcqQuestions.filter((_, i) => i !== qIdx),
     });
@@ -327,7 +327,7 @@ export default function CreateAssessment() {
                                   value={opt.text}
                                   onChange={(e) => {
                                     const newOptions = [...q.options];
-                                    newOptions[oIdx] = { ...newOptions[oIdx], text: e.target.value };
+                                    newOptions[oIdx] = { text: e.target.value, isCorrect: newOptions[oIdx]?.isCorrect ?? false };
                                     updateMcqQuestion(idx, qIdx, { options: newOptions });
                                   }}
                                   placeholder={`Option ${String.fromCharCode(65 + oIdx)}`}
