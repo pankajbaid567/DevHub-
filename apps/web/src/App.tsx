@@ -37,6 +37,12 @@ const Mentor = lazy(() => import('./pages/Mentor'));
 const Career = lazy(() => import('./pages/Career'));
 const Profile = lazy(() => import('./pages/Profile'));
 const Leaderboard = lazy(() => import('./pages/Leaderboard'));
+const AssessmentDashboard = lazy(() => import('./pages/assessments/AssessmentDashboard'));
+const CreateAssessment = lazy(() => import('./pages/assessments/CreateAssessment'));
+const TakeAssessment = lazy(() => import('./pages/assessments/TakeAssessment'));
+const AssessmentDetail = lazy(() => import('./pages/assessments/AssessmentDetail'));
+const AssessmentAnalytics = lazy(() => import('./pages/assessments/AssessmentAnalytics'));
+const TeamManagement = lazy(() => import('./pages/assessments/TeamManagement'));
 const NotFound = lazy(() => import('./pages/NotFound'));
 
 const guard = (el: ReactNode) => <RequireAuth>{el}</RequireAuth>;
@@ -92,6 +98,13 @@ export function App() {
                 <Route path="career" element={guard(<Career />)} />
                 <Route path="u/:username" element={<Profile />} />
                 <Route path="leaderboard" element={<Leaderboard />} />
+                <Route path="assessments" element={guard(<AssessmentDashboard />)} />
+                <Route path="assessments/:orgId" element={guard(<AssessmentDashboard />)} />
+                <Route path="assessments/:orgId/new" element={guard(<CreateAssessment />)} />
+                <Route path="assessments/:orgId/team" element={guard(<TeamManagement />)} />
+                <Route path="assessments/:orgId/a/:assessmentId" element={guard(<AssessmentDetail />)} />
+                <Route path="assessments/:orgId/a/:assessmentId/analytics" element={guard(<AssessmentAnalytics />)} />
+                <Route path="assess/:token" element={<TakeAssessment />} />
                 <Route path="*" element={<NotFound />} />
               </Route>
             </Routes>

@@ -25,7 +25,7 @@ import type { Db } from '../../lib/prisma.js';
 import type { Logger } from '../../lib/logger.js';
 import type { MetricsRegistry } from '../../lib/metrics.js';
 import { AppError, NotFoundError } from '../../core/errors.js';
-import { AIUnavailableError, type AIProvider, type ChatTurn } from './providers/provider.js';
+import { AIUnavailableError, type AIProvider, type ChatTurn, type GenerateResult } from './providers/provider.js';
 import {
   CODE_EXPLAIN_PROMPT,
   groundingBlock,
@@ -222,6 +222,14 @@ export class AiService {
   }
 
   // ---------------------------------------------------------------- one-shot tools
+
+  async chatGenerate(
+    system: string,
+    turns: ChatTurn[],
+    opts?: { temperature?: number; maxOutputTokens?: number },
+  ): Promise<GenerateResult> {
+    return this.provider.generate({ system, turns, ...opts });
+  }
 
   async codeAssist(input: CodeAssistInput): Promise<AiResultEnvelope<{ markdown: string }>> {
     const system = input.mode === 'review' ? CODE_REVIEW_PROMPT : CODE_EXPLAIN_PROMPT;

@@ -45,6 +45,8 @@ import {
   HttpCodeRunner,
   type CodeRunner,
 } from './modules/runs/runner.client.js';
+import { OrgService } from './modules/assessments/org.service.js';
+import { AssessmentService } from './modules/assessments/assessment.service.js';
 
 /**
  * Composition root: the one place where concrete implementations are chosen and wired.
@@ -81,6 +83,8 @@ export interface Container {
   proctoring: ProctoringService;
   progress: ProgressService;
   whiteboards: WhiteboardService;
+  orgs: OrgService;
+  assessments: AssessmentService;
 }
 
 export interface ContainerOverrides {
@@ -205,6 +209,7 @@ export function createContainer(env: Env, overrides: ContainerOverrides = {}): C
   );
 
   const progress = new ProgressService(db, cache);
+  const orgs = new OrgService(db);
 
   return {
     env,
@@ -242,5 +247,7 @@ export function createContainer(env: Env, overrides: ContainerOverrides = {}): C
     proctoring: new ProctoringService(db, logger),
     progress,
     whiteboards: new WhiteboardService(db),
+    orgs,
+    assessments: new AssessmentService(db, orgs, cache, logger),
   };
 }

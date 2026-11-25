@@ -141,6 +141,8 @@ model User {
   badges              UserBadge[]
   cpProfiles          CpPlatformProfile[]
   whiteboards         Whiteboard[]
+  orgMemberships      OrgMember[]
+  createdAssessments  Assessment[]       @relation("AssessmentCreator")
 
   @@index([reputation(sort: Desc)])
   @@map("users")
@@ -393,6 +395,7 @@ model Session {
   submissions       InterviewSubmission[]
   proctoringEvents  ProctoringEvent[]
   whiteboards       Whiteboard[]
+  candidateInvites  CandidateInvite[]
 
   @@index([visibility, status, createdAt(sort: Desc)])
   @@index([hostId])
@@ -747,6 +750,125 @@ model UserBadge {
   @@unique([userId, badge])
   @@index([userId])
   @@map("user_badges")
+}
+
+// ================================================================
+// Organizations & Assessments (OA Platform)
+// ================================================================
+
+enum OrgRole {
+  OWNER
+  ADMIN
+  INTERVIEWER
+  VIEWER
+}
+
+enum AssessmentStatus {
+  DRAFT
+  ACTIVE
+  ARCHIVED
+}
+
+enum CandidateStatus {
+  INVITED
+  STARTED
+  IN_PROGRESS
+  SUBMITTED
+  EVALUATED
+  EXPIRED
+}
+
+/// A company or team that creates assessments and invites candidates.
+model Organization {
+  id        String   @id @default(cuid())
+  name      String
+  slug      String   @unique
+  logoUrl   String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  members     OrgMember[]
+  assessments Assessment[]
+
+  @@map("organizations")
+}
+
+/// Membership in an organization with a role.
+model OrgMember {
+  orgId     String
+  userId    String
+  role      OrgRole  @default(INTERVIEWER)
+  joinedAt  DateTime @default(now())
+
+  org  Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  user User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([orgId, userId])
+  @@index([userId])
+  @@map("org_members")
+}
+
+/// A timed assessment with multiple sections (coding, MCQ, system design).
+model Assessment {
+  id                    String           @id @default(cuid())
+  orgId                 String
+  title                 String
+  description           String           @default("")
+  /// JSON: AssessmentSectionDto[]
+  sections              Json
+  totalDurationMinutes  Int              @default(60)
+  /// JSON: string[] of allowed languages
+  allowedLanguages      Json             @default("[\"javascript\",\"typescript\",\"python\"]")
+  /// JSON: proctoring config
+  proctoringConfig      Json             @default("{\"enabled\":true,\"requireCamera\":true,\"requireScreenShare\":true,\"enforceFullscreen\":true,\"blockCopyPaste\":true}")
+  passingScore          Int              @default(60)
+  instructions          String           @default("")
+  shuffleQuestions      Boolean          @default(false)
+  showScoreToCandidate  Boolean          @default(false)
+  status                AssessmentStatus @default(DRAFT)
+  createdById           String
+  createdAt             DateTime         @default(now())
+  updatedAt             DateTime         @updatedAt
+
+  org        Organization      @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  createdBy  User              @relation("AssessmentCreator", fields: [createdById], references: [id], onDelete: Cascade)
+  invites    CandidateInvite[]
+
+  @@index([orgId, status, createdAt(sort: Desc)])
+  @@index([createdById])
+  @@map("assessments")
+}
+
+/// A unique invite link for a candidate to take an assessment.
+model CandidateInvite {
+  id           String          @id @default(cuid())
+  assessmentId String
+  email        String
+  name         String?
+  /// URL-safe token for the invite link.
+  token        String          @unique
+  status       CandidateStatus @default(INVITED)
+  /// Links to a session once the candidate starts.
+  sessionId    String?
+  startedAt    DateTime?
+  submittedAt  DateTime?
+  expiresAt    DateTime
+  /// JSON: section results, MCQ responses, coding solutions
+  results      Json?
+  score        Int?
+  maxScore     Int?
+  /// AI-generated feedback summary
+  aiFeedback   String?
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+
+  assessment Assessment @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+  session    Session?   @relation(fields: [sessionId], references: [id], onDelete: SetNull)
+
+  @@index([assessmentId, status])
+  @@index([email])
+  @@index([token])
+  @@map("candidate_invites")
 }
 
 /// Saved whiteboard diagrams for system design interviews.

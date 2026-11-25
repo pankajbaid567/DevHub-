@@ -26,6 +26,7 @@ import { aiRoutes } from './modules/ai/ai.routes.js';
 import { searchRoutes } from './modules/search/search.routes.js';
 import { adminRoutes, reportRoutes } from './modules/moderation/moderation.routes.js';
 import type { SessionBroadcaster } from './realtime/socket.js';
+import { assessmentRoutes, candidateRoutes } from './modules/assessments/assessment.routes.js';
 
 export const API_PREFIX = '/api/v1';
 
@@ -147,6 +148,8 @@ export function createApp(
   mount('/search', (ctx) => searchRoutes(ctx, c));
   mount('/reports', (ctx) => reportRoutes(ctx, c));
   mount('/admin', (ctx) => adminRoutes(ctx, c));
+  mount('/orgs', (ctx) => assessmentRoutes(ctx, c));
+  mount('/assess', (ctx) => candidateRoutes(ctx, c));
   app.use(API_PREFIX, api);
 
   const openapi = () =>

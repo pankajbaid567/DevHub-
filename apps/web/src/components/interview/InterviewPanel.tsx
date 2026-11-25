@@ -12,7 +12,10 @@ import {
   PhoneOff,
   Play,
   Plus,
+  Send,
   Sparkles,
+  Volume2,
+  VolumeX,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import {
@@ -29,6 +32,7 @@ import { api, errorMessage } from '../../lib/api';
 import { qk } from '../../lib/queryClient';
 import { problemsQuery } from '../../lib/interview';
 import { useVoiceInterviewer } from '../../lib/useVoiceInterviewer';
+import { useTextVoiceInterviewer } from '../../lib/useTextVoiceInterviewer';
 import { cn } from '../../lib/utils';
 import { Markdown } from '../Markdown';
 import { Badge } from '../ui/primitives';
@@ -159,7 +163,7 @@ export function InterviewPanel({
         />
       )}
       {canTalk && live && !state.endedAt && (state.startedAt || isInterviewer) && (
-        <VoiceInterviewer
+        <InterviewerSection
           sessionId={session.id}
           state={state}
           offsetMs={offsetMs}
@@ -170,6 +174,255 @@ export function InterviewPanel({
       {isInterviewer && <Scorecard sessionId={session.id} />}
       {isInterviewer && state.proctoring && <ProctoringLog sessionId={session.id} />}
     </div>
+  );
+}
+
+function InterviewerSection({
+  sessionId,
+  state,
+  offsetMs,
+  getCode,
+}: {
+  sessionId: string;
+  state: InterviewStateDto;
+  offsetMs: number;
+  getCode: () => string;
+}) {
+  const { data: bank } = useQuery(problemsQuery);
+  if (bank?.voiceEnabled) {
+    return (
+      <VoiceInterviewer sessionId={sessionId} state={state} offsetMs={offsetMs} getCode={getCode} />
+    );
+  }
+  if (bank?.chatEnabled) {
+    return (
+      <TextVoiceInterviewer
+        sessionId={sessionId}
+        state={state}
+        offsetMs={offsetMs}
+        getCode={getCode}
+      />
+    );
+  }
+  return null;
+}
+
+function TextVoiceInterviewer({
+  sessionId,
+  state,
+  offsetMs,
+  getCode,
+}: {
+  sessionId: string;
+  state: InterviewStateDto;
+  offsetMs: number;
+  getCode: () => string;
+}) {
+  const qc = useQueryClient();
+  const voice = useTextVoiceInterviewer({
+    sessionId,
+    getCode,
+    endsAt: state.endsAt,
+    clockOffsetMs: offsetMs,
+  });
+  const [typedInput, setTypedInput] = useState('');
+  const feedback = useMutation({
+    mutationFn: () =>
+      api<InterviewFeedbackDto>(`/sessions/${sessionId}/interview/feedback`, {
+        method: 'POST',
+        body: { transcript: voice.transcript, code: getCode() },
+      }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['interview-feedback', sessionId] });
+      voice.reset();
+      toast.success('Feedback is ready');
+    },
+    onError: (err) => toast.error(errorMessage(err)),
+  });
+  const list = useRef<HTMLOListElement>(null);
+  useEffect(() => {
+    list.current?.scrollTo({ top: list.current.scrollHeight });
+  }, [voice.transcript]);
+
+  const active = voice.status === 'live' || voice.status === 'connecting';
+  const answered = voice.transcript.some((t) => t.role === 'candidate');
+
+  const handleSendTyped = () => {
+    if (!typedInput.trim()) return;
+    voice.sendTyped(typedInput);
+    setTypedInput('');
+  };
+
+  return (
+    <section aria-labelledby="text-voice-heading" className="rounded-xl border border-line p-3">
+      <div className="flex items-center gap-2">
+        <h2
+          id="text-voice-heading"
+          className="flex items-center gap-1.5 text-sm font-semibold"
+        >
+          <Bot className="h-4 w-4 text-accent" aria-hidden /> AI interviewer
+        </h2>
+        {voice.status === 'live' && (
+          <Badge tone={voice.speaking ? 'accent' : voice.listening ? 'success' : 'neutral'}>
+            {voice.speaking ? 'Speaking' : voice.listening ? 'Listening' : 'Ready'}
+          </Badge>
+        )}
+      </div>
+      <p className="mt-0.5 text-xs text-muted">
+        Practice with an AI interviewer that sees your code. Speak or type your answers.
+      </p>
+
+      {voice.status === 'live' && (
+        <div className="mt-3 flex items-center gap-2">
+          {voice.listening && (
+            <div className="flex items-center gap-1.5">
+              <span className="relative flex h-2.5 w-2.5">
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-success opacity-75" />
+                <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-success" />
+              </span>
+              <span className="text-xs text-success">Listening</span>
+            </div>
+          )}
+          {voice.speaking && (
+            <div className="flex items-center gap-1.5">
+              <span className="relative flex h-2.5 w-2.5">
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-accent opacity-75" />
+                <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-accent" />
+              </span>
+              <span className="text-xs text-accent">AI speaking</span>
+            </div>
+          )}
+          <div className="ml-auto flex gap-1">
+            <Button
+              size="sm"
+              variant="ghost"
+              aria-pressed={voice.muted}
+              aria-label={voice.muted ? 'Unmute microphone' : 'Mute microphone'}
+              onClick={voice.toggleMute}
+              icon={voice.muted ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
+            />
+            <Button
+              size="sm"
+              variant="ghost"
+              aria-pressed={!voice.speakerOn}
+              aria-label={voice.speakerOn ? 'Mute speaker' : 'Unmute speaker'}
+              onClick={voice.toggleSpeaker}
+              icon={
+                voice.speakerOn ? (
+                  <Volume2 className="h-4 w-4" />
+                ) : (
+                  <VolumeX className="h-4 w-4" />
+                )
+              }
+            />
+          </div>
+        </div>
+      )}
+
+      <div className="mt-3 flex flex-wrap gap-2">
+        {!active ? (
+          <Button
+            size="sm"
+            icon={<Mic className="h-3.5 w-3.5" />}
+            onClick={() => void voice.start()}
+          >
+            {voice.transcript.length ? 'Resume interview' : 'Start interview'}
+          </Button>
+        ) : (
+          <Button
+            size="sm"
+            variant="danger"
+            icon={
+              voice.status === 'connecting' ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <PhoneOff className="h-3.5 w-3.5" />
+              )
+            }
+            onClick={voice.stop}
+          >
+            {voice.status === 'connecting' ? 'Connecting...' : 'End session'}
+          </Button>
+        )}
+        {!active && answered && (
+          <Button
+            size="sm"
+            variant="outline"
+            icon={<Sparkles className="h-3.5 w-3.5" />}
+            loading={feedback.isPending}
+            onClick={() => feedback.mutate()}
+          >
+            Get feedback
+          </Button>
+        )}
+      </div>
+
+      {voice.error && (
+        <p role="alert" className="mt-2 text-sm text-danger">
+          {voice.error}
+        </p>
+      )}
+
+      {/* Fallback text input when speech recognition is unavailable or as an alternative */}
+      {active && (
+        <div className="mt-3 flex gap-2">
+          <input
+            type="text"
+            className="flex-1 rounded-lg border border-line bg-surface-2 px-3 py-1.5 text-sm placeholder:text-muted focus:border-accent focus:outline-none"
+            placeholder={
+              voice.hasSpeechRecognition
+                ? 'Or type your answer...'
+                : 'Type your answer...'
+            }
+            value={typedInput}
+            onChange={(e) => setTypedInput(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                handleSendTyped();
+              }
+            }}
+          />
+          <Button
+            size="sm"
+            variant="outline"
+            icon={<Send className="h-3.5 w-3.5" />}
+            onClick={handleSendTyped}
+            disabled={!typedInput.trim()}
+          />
+        </div>
+      )}
+
+      {/* Transcript / captions */}
+      {(voice.transcript.length > 0 || voice.interimText) && (
+        <ol
+          ref={list}
+          aria-label="Interview transcript"
+          className="mt-3 max-h-64 space-y-2 overflow-y-auto text-sm"
+        >
+          {voice.transcript.map((t, i) => (
+            <li
+              key={i}
+              className={cn(
+                'rounded-lg px-2.5 py-1.5',
+                t.role === 'interviewer' ? 'bg-accent-soft' : 'bg-surface-2',
+              )}
+            >
+              <span className="mr-1 text-xs font-semibold text-muted">
+                {t.role === 'interviewer' ? 'Interviewer' : 'You'}
+              </span>
+              {t.text}
+            </li>
+          ))}
+          {voice.interimText && (
+            <li className="rounded-lg bg-surface-2 px-2.5 py-1.5 italic text-muted">
+              <span className="mr-1 text-xs font-semibold">You</span>
+              {voice.interimText}...
+            </li>
+          )}
+        </ol>
+      )}
+    </section>
   );
 }
 

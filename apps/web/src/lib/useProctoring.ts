@@ -11,11 +11,6 @@ interface ProctoringState {
   screenError: string | null;
 }
 
-/**
- * Enforces proctoring rules on the candidate side: fullscreen, focus tracking,
- * copy-paste blocking, camera capture and screen share. Violations are reported
- * through the socket and the interviewer sees them in real time.
- */
 export function useProctoring(
   sessionId: string,
   config: ProctoringConfigDto | null,
@@ -32,35 +27,37 @@ export function useProctoring(
     screenError: null,
   });
   const disposers = useRef<Array<() => void>>([]);
+  const cameraRef = useRef<MediaStream | null>(null);
 
   const emit = useCallback(
     (type: ProctoringEventType, detail = '') => {
       const socket = getSocket();
       socket.emit('proctoring:event', { sessionId, type, detail }, () => {});
-      setState((s) => ({ ...s, violations: s.violations + 1 }));
+      if (type !== 'CAMERA_SNAPSHOT') {
+        setState((s) => ({ ...s, violations: s.violations + 1 }));
+      }
     },
     [sessionId],
   );
 
-  // Start proctoring when interview starts and config is enabled.
   useEffect(() => {
     if (!config?.enabled || isInterviewer || !started) return;
 
     const cleanup: Array<() => void> = [];
 
-    // Tab switch / focus lost detection via visibilitychange.
+    // --- Tab switch / visibility ---
     const onVisibility = () => {
       if (document.hidden) emit('TAB_SWITCH', 'Tab became hidden');
     };
     document.addEventListener('visibilitychange', onVisibility);
     cleanup.push(() => document.removeEventListener('visibilitychange', onVisibility));
 
-    // Window blur detection.
+    // --- Window blur ---
     const onBlur = () => emit('FOCUS_LOST', 'Window lost focus');
     window.addEventListener('blur', onBlur);
     cleanup.push(() => window.removeEventListener('blur', onBlur));
 
-    // Fullscreen enforcement.
+    // --- Fullscreen enforcement ---
     if (config.enforceFullscreen) {
       const onFullscreenChange = () => {
         if (!document.fullscreenElement) {
@@ -69,12 +66,10 @@ export function useProctoring(
       };
       document.addEventListener('fullscreenchange', onFullscreenChange);
       cleanup.push(() => document.removeEventListener('fullscreenchange', onFullscreenChange));
-
-      // Request fullscreen on start.
       document.documentElement.requestFullscreen?.().catch(() => {});
     }
 
-    // Copy-paste blocking.
+    // --- Copy-paste blocking ---
     if (config.blockCopyPaste) {
       const block = (e: ClipboardEvent) => {
         e.preventDefault();
@@ -90,7 +85,112 @@ export function useProctoring(
       });
     }
 
-    // Listen for server warnings.
+    // --- Right-click blocking ---
+    const onContextMenu = (e: MouseEvent) => {
+      e.preventDefault();
+      emit('RIGHT_CLICK', 'Right-click blocked');
+    };
+    document.addEventListener('contextmenu', onContextMenu);
+    cleanup.push(() => document.removeEventListener('contextmenu', onContextMenu));
+
+    // --- DevTools detection (key combos) ---
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (
+        e.key === 'F12' ||
+        (e.ctrlKey && e.shiftKey && ['I', 'J', 'C'].includes(e.key.toUpperCase())) ||
+        (e.metaKey && e.altKey && ['I', 'J', 'C'].includes(e.key.toUpperCase()))
+      ) {
+        e.preventDefault();
+        emit('DEVTOOLS_OPEN', 'DevTools shortcut blocked');
+      }
+    };
+    document.addEventListener('keydown', onKeyDown);
+    cleanup.push(() => document.removeEventListener('keydown', onKeyDown));
+
+    // --- DevTools detection (resize heuristic) ---
+    let devToolsOpen = false;
+    const devToolsCheck = setInterval(() => {
+      const widthDiff = window.outerWidth - window.innerWidth;
+      const heightDiff = window.outerHeight - window.innerHeight;
+      const isOpen = widthDiff > 200 || heightDiff > 200;
+      if (isOpen && !devToolsOpen) {
+        devToolsOpen = true;
+        emit('DEVTOOLS_OPEN', 'DevTools detected via window size');
+      } else if (!isOpen) {
+        devToolsOpen = false;
+      }
+    }, 2000);
+    cleanup.push(() => clearInterval(devToolsCheck));
+
+    // --- Multiple tab detection via BroadcastChannel ---
+    let channel: BroadcastChannel | null = null;
+    try {
+      channel = new BroadcastChannel(`devhub-proctor-${sessionId}`);
+      channel.postMessage({ type: 'join' });
+      channel.onmessage = (e) => {
+        if (e.data?.type === 'join') {
+          emit('MULTIPLE_TABS', 'Session opened in another tab');
+          channel?.postMessage({ type: 'ack' });
+        } else if (e.data?.type === 'ack') {
+          emit('MULTIPLE_TABS', 'Session already open in another tab');
+        }
+      };
+    } catch {
+      // BroadcastChannel not supported
+    }
+    cleanup.push(() => {
+      try { channel?.close(); } catch {}
+    });
+
+    // --- Periodic camera snapshots (every 30s) ---
+    const snapshotInterval = setInterval(() => {
+      const stream = cameraRef.current;
+      if (!stream) return;
+      const track = stream.getVideoTracks()[0];
+      if (!track || track.readyState !== 'live') return;
+      try {
+        const canvas = document.createElement('canvas');
+        const video = document.createElement('video');
+        video.srcObject = stream;
+        video.muted = true;
+        video.playsInline = true;
+        video.play().then(() => {
+          canvas.width = 160;
+          canvas.height = 120;
+          const ctx = canvas.getContext('2d');
+          if (ctx) {
+            ctx.drawImage(video, 0, 0, 160, 120);
+            const dataUrl = canvas.toDataURL('image/jpeg', 0.3);
+            emit('CAMERA_SNAPSHOT', dataUrl);
+          }
+          video.srcObject = null;
+        }).catch(() => {});
+      } catch {}
+    }, 30_000);
+    cleanup.push(() => clearInterval(snapshotInterval));
+
+    // --- Idle detection (60s no activity) ---
+    let idleTimer: ReturnType<typeof setTimeout> | null = null;
+    let idleFired = false;
+    const resetIdle = () => {
+      if (idleTimer) clearTimeout(idleTimer);
+      idleFired = false;
+      idleTimer = setTimeout(() => {
+        if (!idleFired) {
+          idleFired = true;
+          emit('IDLE_DETECTED', 'No activity for 60 seconds');
+        }
+      }, 60_000);
+    };
+    resetIdle();
+    const idleEvents = ['mousemove', 'mousedown', 'keydown', 'touchstart', 'scroll'] as const;
+    idleEvents.forEach((evt) => document.addEventListener(evt, resetIdle));
+    cleanup.push(() => {
+      if (idleTimer) clearTimeout(idleTimer);
+      idleEvents.forEach((evt) => document.removeEventListener(evt, resetIdle));
+    });
+
+    // --- Server warnings ---
     const socket = getSocket();
     const onWarning = (p: { sessionId: string; message: string }) => {
       if (p.sessionId === sessionId) {
@@ -118,6 +218,7 @@ export function useProctoring(
           stream.getTracks().forEach((t) => t.stop());
           return;
         }
+        cameraRef.current = stream;
         setState((s) => ({ ...s, cameraStream: stream, cameraError: null }));
       })
       .catch(() => {
@@ -125,6 +226,7 @@ export function useProctoring(
       });
     return () => {
       cancelled = true;
+      cameraRef.current = null;
       setState((prev) => {
         prev.cameraStream?.getTracks().forEach((t) => t.stop());
         return { ...prev, cameraStream: null };
@@ -143,7 +245,6 @@ export function useProctoring(
           stream.getTracks().forEach((t) => t.stop());
           return;
         }
-        // Detect when user stops sharing.
         stream.getVideoTracks()[0]?.addEventListener('ended', () => {
           emit('SCREEN_SHARE_STOPPED', 'Screen share ended by user');
           setState((s) => ({ ...s, screenStream: null }));

@@ -852,6 +852,11 @@ export const PROCTORING_EVENT_TYPES = [
   'COPY_PASTE',
   'FOCUS_LOST',
   'SCREEN_SHARE_STOPPED',
+  'RIGHT_CLICK',
+  'DEVTOOLS_OPEN',
+  'MULTIPLE_TABS',
+  'CAMERA_SNAPSHOT',
+  'IDLE_DETECTED',
 ] as const;
 export type ProctoringEventType = (typeof PROCTORING_EVENT_TYPES)[number];
 

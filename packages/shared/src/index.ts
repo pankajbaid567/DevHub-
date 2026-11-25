@@ -12,3 +12,4 @@ export * from './realtime.js';
 export * from './search.js';
 export * from './moderation.js';
 export * from './interview.js';
+export * from './assessment.js';

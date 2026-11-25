@@ -1,3 +1,4 @@
+import { z } from 'zod';
 import {
   idParamSchema,
   interviewControlSchema,
@@ -25,7 +26,11 @@ export function interviewRoutes(
     summary: 'The built-in problem bank, and whether the AI voice interviewer is available',
     auth: 'optional',
     handler: async (_req, res) => {
-      res.json({ items: INTERVIEW_PROBLEMS, voiceEnabled: c.interviews.voiceEnabled });
+      res.json({
+        items: INTERVIEW_PROBLEMS,
+        voiceEnabled: c.interviews.voiceEnabled,
+        chatEnabled: !c.ai.isDemo,
+      });
     },
   });
 
@@ -166,6 +171,39 @@ export function interviewRoutes(
       res.json({
         items: await c.interviews.listFeedback(currentUser(req), req.params.id as string),
       });
+    },
+  });
+
+  // ---------------------------------------------------------------- chat interviewer
+
+  const chatMessageSchema = z.object({
+    message: z.string().trim().min(1).max(4_000),
+    context: z
+      .object({
+        code: z.string().max(16_000).optional(),
+        runOutput: z.string().max(4_000).optional(),
+      })
+      .optional(),
+  });
+
+  defineRoute(ctx, {
+    method: 'post',
+    path: '/:id/interview/chat',
+    tag: 'Interviews',
+    summary: 'Send a text message to the AI interviewer and get a spoken-length reply',
+    auth: 'required',
+    params: idParamSchema,
+    body: chatMessageSchema,
+    responses: { 200: 'Reply', 409: 'Invalid state', 429: 'Rate limited', 503: 'AI unavailable' },
+    handler: async (req, res) => {
+      res.json(
+        await c.interviews.chatMessage(
+          currentUser(req),
+          req.params.id as string,
+          req.body.message,
+          req.body.context,
+        ),
+      );
     },
   });
 

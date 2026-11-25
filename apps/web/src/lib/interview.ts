@@ -5,7 +5,9 @@ import { api } from './api';
 export const problemsQuery = {
   queryKey: ['interview-problems'],
   queryFn: () =>
-    api<{ items: InterviewProblem[]; voiceEnabled: boolean }>('/sessions/interview/problems'),
+    api<{ items: InterviewProblem[]; voiceEnabled: boolean; chatEnabled: boolean }>(
+      '/sessions/interview/problems',
+    ),
   staleTime: 10 * 60_000,
 };
 

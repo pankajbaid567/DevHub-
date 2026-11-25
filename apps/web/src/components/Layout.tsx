@@ -142,6 +142,9 @@ function UserMenu() {
           <Link to="/interviews" className={item}>
             <Mic className="h-4 w-4" /> My interviews
           </Link>
+          <Link to="/assessments" className={item}>
+            <Zap className="h-4 w-4" /> Assessments
+          </Link>
           <Link to={`/u/${user.username}?tab=resume`} className={item}>
             <Sparkles className="h-4 w-4" /> Resume & skills
           </Link>

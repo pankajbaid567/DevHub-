@@ -244,6 +244,60 @@ export class InterviewService {
     return rows.map((r) => this.toFeedbackDto(r));
   }
 
+  /** Text-based interview chat: sends user message + history to the AI and returns a reply. */
+  async chatMessage(
+    user: AuthUser,
+    sessionId: string,
+    message: string,
+    context?: { code?: string; runOutput?: string },
+  ): Promise<{ reply: string; transcript: TranscriptEntry[] }> {
+    const { role, status } = await this.sessions.requireParticipant(user, sessionId);
+    if (role === 'VIEWER') throw new ForbiddenError('Viewers cannot talk to the interviewer');
+    if (status !== 'LIVE')
+      throw new AppError(409, ErrorCode.SESSION_NOT_LIVE, 'The session is not live');
+    const s = await this.load(sessionId);
+    if (s.hostId !== user.id && !s.interviewStartedAt)
+      throw conflict('Wait for the interviewer to start the interview');
+    if (s.interviewEndedAt) throw conflict('This interview has ended');
+
+    const cacheKey = `interview:chat:${sessionId}:${user.id}`;
+    const history = ((await this.cache.get(cacheKey)) as TranscriptEntry[] | null) ?? [];
+
+    const systemPrompt =
+      interviewerInstruction({
+        title: s.problemTitle ?? 'Coding problem',
+        statement: s.problemStatement ?? '',
+      }) +
+      '\n\nIMPORTANT: Keep every reply to one to three short sentences since your response will be spoken aloud via text-to-speech.';
+
+    const turns: { role: 'user' | 'assistant'; content: string }[] = [];
+    for (const entry of history) {
+      turns.push({
+        role: entry.role === 'candidate' ? 'user' : 'assistant',
+        content: entry.text,
+      });
+    }
+
+    let userContent = message;
+    if (context?.code) userContent += `\n\n[code]\n${context.code.slice(0, 8_000)}`;
+    if (context?.runOutput) userContent += `\n\n[run]\n${context.runOutput.slice(0, 2_000)}`;
+    turns.push({ role: 'user', content: userContent });
+
+    const { text: reply } = await this.ai.chatGenerate(systemPrompt, turns, {
+      temperature: 0.7,
+      maxOutputTokens: 300,
+    });
+
+    const updated: TranscriptEntry[] = [
+      ...history,
+      { role: 'candidate', text: message },
+      { role: 'interviewer', text: reply },
+    ];
+    const trimmed = updated.length > 60 ? updated.slice(-60) : updated;
+    await this.cache.set(cacheKey, trimmed, 3600);
+    return { reply, transcript: trimmed };
+  }
+
   private toFeedbackDto(r: {
     id: string;
     sessionId: string;
