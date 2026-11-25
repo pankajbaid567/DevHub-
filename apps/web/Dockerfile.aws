@@ -14,7 +14,7 @@ COPY packages/shared packages/shared
 COPY apps/web apps/web
 ENV NODE_OPTIONS="--max-old-space-size=1024"
 RUN npm run build -w @devhub/shared
-RUN npm run build -w @devhub/web
+RUN cd apps/web && npx vite build
 
 FROM nginxinc/nginx-unprivileged:1.27-alpine AS runtime
 COPY apps/web/nginx.aws.conf /etc/nginx/conf.d/default.conf
