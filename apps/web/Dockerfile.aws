@@ -8,12 +8,13 @@ COPY packages/shared/package.json packages/shared/
 COPY apps/api/package.json apps/api/
 COPY apps/web/package.json apps/web/
 COPY apps/runner/package.json apps/runner/
-RUN --mount=type=cache,target=/root/.npm npm ci --workspace @devhub/shared --workspace @devhub/web --include-workspace-root=false
+RUN npm ci --workspace @devhub/shared --workspace @devhub/web --include-workspace-root=false
 COPY tsconfig.base.json ./
 COPY packages/shared packages/shared
 COPY apps/web apps/web
-ENV NODE_OPTIONS="--max-old-space-size=1536"
-RUN npm run build -w @devhub/shared && npm run build -w @devhub/web
+ENV NODE_OPTIONS="--max-old-space-size=1024"
+RUN npm run build -w @devhub/shared
+RUN npm run build -w @devhub/web
 
 FROM nginxinc/nginx-unprivileged:1.27-alpine AS runtime
 COPY apps/web/nginx.aws.conf /etc/nginx/conf.d/default.conf
